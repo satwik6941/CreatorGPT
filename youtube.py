@@ -3,6 +3,7 @@ import dotenv as env
 import os
 import isodate
 import pandas as pd
+import preprocessing
 
 env.load_dotenv()
 API_KEY = os.getenv('YOUTUBE_API_KEY')
@@ -153,4 +154,11 @@ if os.path.exists('all_comments.csv'):
     print(f"Total comments in CSV: {len(final_df)}")
 else:
     print("No CSV file found.")
+
+# Clean the comments in the CSV file
+cleaned_df = preprocessing.clean_symbols('all_comments.csv')
+if cleaned_df is not None:
+    print("Cleaned comments saved to 'cleaned_all_comments.csv'")
+else:
+    print("Error: No cleaned data returned from preprocessing function")
 
