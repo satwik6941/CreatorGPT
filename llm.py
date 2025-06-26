@@ -161,32 +161,32 @@ for file_num in range(1, total_files_created + 1):
                         f.write("="*60 + "\n\n")
                         f.write(response.text)
                     
-                    print(f"✅ Analysis completed and saved to {analyzed_filename}")
+                    print(f"[SUCCESS] Analysis completed and saved to {analyzed_filename}")
                     break
                 else:
-                    print(f"⚠️ Incomplete analysis detected. Retrying... ({retry_count + 1}/{max_retries})")
+                    print(f"[WARNING] Incomplete analysis detected. Retrying... ({retry_count + 1}/{max_retries})")
                     retry_count += 1
                     time.sleep(2)
                     
             except Exception as e:
                 retry_count += 1
-                print(f"❌ Error on attempt {retry_count}: {e}")
+                print(f"[ERROR] Error on attempt {retry_count}: {e}")
                 if retry_count < max_retries:
                     time.sleep(5)
                 else:
-                    print(f"❌ Failed to process {filepath} after {max_retries} attempts")
+                    print(f"[ERROR] Failed to process {filepath} after {max_retries} attempts")
                     break
         
     except Exception as e:
-        print(f"❌ Critical error processing {filepath}: {e}")
+        print(f"[ERROR] Critical error processing {filepath}: {e}")
 
-print("\n🎉 All files processing completed!")
+print("\n[COMPLETE] All files processing completed!")
 
 # Verify results
 print("\n📊 VERIFICATION SUMMARY:")
 for file_num in range(1, total_files_created + 1):
     analyzed_file = f'analyzed_comments_batch_{file_num}.txt'
     if os.path.exists(analyzed_file):
-        print(f"✅ {analyzed_file} - Created successfully")
+        print(f"[SUCCESS] {analyzed_file} - Created successfully")
     else:
-        print(f"❌ {analyzed_file} - Missing or failed")
+        print(f"[ERROR] {analyzed_file} - Missing or failed")

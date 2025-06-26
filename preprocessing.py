@@ -1,11 +1,10 @@
 import pandas as pd
 import re 
 
-df = pd.read_csv('all_comments.csv')  
-
 symbols = ['?', '.', ',', ':', ';', '!', '@', '&', '%', '*', '^', '$']
 
-def clean_symbols(comment):
+def clean_comment_text(comment):
+    """Clean individual comment text"""
     if pd.isna(comment):  
         return comment
     
@@ -39,10 +38,26 @@ def clean_symbols(comment):
         comment = comment[1:]
     return comment
 
-df['comment'] = df['comment'].apply(clean_symbols)
+def clean_symbols(csv_file_path):
+    """Clean symbols from comments in the specified CSV file"""
+    try:
+        df = pd.read_csv(csv_file_path)
+        print(f"Loading {len(df)} comments from {csv_file_path}")
+    except FileNotFoundError:
+        print(f"Error: {csv_file_path} not found!")
+        return None
     
-df = df.dropna(subset=['comment'])
-
-df.to_csv("cleaned_all_comments.csv", index=False, encoding="utf-8")
-
-print(f"Processed dataset - {len(df)} rows remaining after cleaning")
+    # Apply cleaning function to comments
+    df['comment'] = df['comment'].apply(clean_comment_text)
+    
+    # Remove rows where comments became None (had URLs)
+    df = df.dropna(subset=['comment'])
+    
+    # Save cleaned data
+    output_file = "cleaned_all_comments.csv"
+    df.to_csv(output_file, index=False, encoding="utf-8")
+    
+    print(f"Processed dataset - {len(df)} rows remaining after cleaning")
+    print(f"Cleaned comments saved to {output_file}")
+    
+    return df
