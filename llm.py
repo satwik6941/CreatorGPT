@@ -183,7 +183,7 @@ for file_num in range(1, total_files_created + 1):
 print("\n[COMPLETE] All files processing completed!")
 
 # Verify results
-print("\n📊 VERIFICATION SUMMARY:")
+print("\n VERIFICATION SUMMARY:")
 for file_num in range(1, total_files_created + 1):
     analyzed_file = f'analyzed_comments_batch_{file_num}.txt'
     if os.path.exists(analyzed_file):
