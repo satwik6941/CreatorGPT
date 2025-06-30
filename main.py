@@ -180,31 +180,7 @@ class CreatorGPTAnalyzer:
             print(f" Failed to run sentiment analysis: {str(e)}")
             return False
     
-    def cleanup_temp_files(self):
-        """Optional cleanup of temporary batch files"""
-        print("\nCleanup")
-        print("-" * 10)
-        
-        choice = input("Do you want to delete temporary batch files? (y/n): ").strip().lower()
-        
-        if choice == 'y':
-            # Delete batch files
-            batch_files = glob.glob('comments_batch_*.txt') + glob.glob('analyzed_comments_batch_*.txt')
-            
-            deleted_count = 0
-            for file in batch_files:
-                try:
-                    os.remove(file)
-                    deleted_count += 1
-                except:
-                    pass
-            
-            if deleted_count > 0:
-                print(f"Deleted {deleted_count} temporary batch files")
-            else:
-                print("ℹNo temporary files to delete")
-        else:
-            print("ℹTemporary files kept")
+
     
     def run_complete_pipeline(self):
         """Run the complete analysis pipeline"""
@@ -284,10 +260,6 @@ def main():
     
     # Run the complete pipeline automatically
     success = analyzer.run_complete_pipeline()
-    
-    # Optional cleanup
-    if success:
-        analyzer.cleanup_temp_files()
     
     # Print final summary
     analyzer.print_final_summary(success)
