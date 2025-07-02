@@ -11,6 +11,7 @@ import pandas as pd
 import time
 import json
 import re
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 import threading
 import queue
@@ -18,6 +19,7 @@ import io
 import contextlib
 import glob
 from collections import Counter
+from datetime import datetime
 
 app = FastAPI(title="CreatorGPT API", version="1.0.0")
 
@@ -181,21 +183,41 @@ analysis_state = {
 async def broadcast_analysis_update():
     """Broadcast current analysis state to all connected WebSocket clients"""
     try:
-        message = json.dumps(analysis_state)
+        # Ensure the analysis_state is JSON serializable
+        serializable_state = dict(analysis_state)
+        
+        # Convert channel_info to dict if it's an object
+        if serializable_state.get("channel_info") and hasattr(serializable_state["channel_info"], "__dict__"):
+            serializable_state["channel_info"] = serializable_state["channel_info"].__dict__
+        
+        message = json.dumps(serializable_state)
+        print(f"[DEBUG] Broadcasting to {len(manager.active_connections)} clients: {serializable_state.get('message', 'No message')}")
         await manager.broadcast(message)
     except Exception as e:
-        print(f"Error broadcasting update: {e}")
+        print(f"[ERROR] Error broadcasting update: {e}")
+        import traceback
+        traceback.print_exc()
 
 def update_analysis_state(updates: dict):
     """Update analysis state and broadcast to WebSocket clients"""
+    global analysis_state
     analysis_state.update(updates)
-    # Schedule broadcast in the event loop
+    
+    # Print debug info
+    print(f"[DEBUG] Analysis state updated: {updates}")
+    
+    # Try to broadcast immediately if there's an event loop
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            asyncio.create_task(broadcast_analysis_update())
-    except:
-        # If no event loop is running, skip broadcasting
+            # Create task to broadcast
+            task = asyncio.create_task(broadcast_analysis_update())
+        else:
+            # If no running loop, try to create one
+            asyncio.run(broadcast_analysis_update())
+    except Exception as e:
+        print(f"[WARNING] Could not broadcast update: {e}")
+        # Fallback: just update the state without broadcasting
         pass
 
 class OutputCapture:
@@ -656,19 +678,12 @@ async def run_analysis_pipeline(channel_id: str):
                             
                             # Update channel info if provided
                             if "channel_name" in progress_data:
-                                if analysis_state["channel_info"] is None:
-                                    update_data["channel_info"] = ChannelInfo(
-                                        channel_name=progress_data["channel_name"],
-                                        subscriber_count=str(progress_data.get("subscriber_count", "Unknown")),
-                                        total_comments=progress_data.get("total_comments", 0)
-                                    )
-                                else:
-                                    # Update existing channel info
-                                    analysis_state["channel_info"].channel_name = progress_data["channel_name"]
-                                    if "subscriber_count" in progress_data:
-                                        analysis_state["channel_info"].subscriber_count = str(progress_data["subscriber_count"])
-                                    if "total_comments" in progress_data:
-                                        analysis_state["channel_info"].total_comments = progress_data["total_comments"]
+                                channel_info_dict = {
+                                    "channel_name": progress_data["channel_name"],
+                                    "subscriber_count": str(progress_data.get("subscriber_count", "Unknown")),
+                                    "total_comments": progress_data.get("total_comments", 0)
+                                }
+                                update_data["channel_info"] = channel_info_dict
                             
                             # Handle error states
                             if "error" in progress_data:
@@ -1084,3 +1099,22 @@ async def get_available_files():
             files["data_files"].append(data_file)
     
     return files
+
+@app.post("/api/test-websocket")
+async def test_websocket():
+    """Test WebSocket broadcasting"""
+    test_message = {
+        "status": "test",
+        "step": "websocket_test",
+        "message": "WebSocket test message",
+        "progress": 50,
+        "logs": [f"Test message sent at {datetime.now().isoformat()}"]
+    }
+    
+    update_analysis_state(test_message)
+    
+    return {
+        "message": "Test message sent",
+        "active_connections": len(manager.active_connections),
+        "test_data": test_message
+    }

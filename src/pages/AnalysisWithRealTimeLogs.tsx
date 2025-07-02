@@ -31,6 +31,8 @@ const AnalysisWithRealTimeLogs = () => {
       setResults(analysisResults);
     } catch (error) {
       console.error('Error fetching analysis results:', error);
+      // Still set as complete even if results fetch fails
+      // The DashboardDisplay component will handle loading files directly
     }
   };
 

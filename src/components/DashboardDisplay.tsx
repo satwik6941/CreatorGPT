@@ -120,7 +120,7 @@ const DashboardDisplay = () => {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => window.open(apiService.getDashboardImageUrl(), '_blank')}
+                    onClick={() => window.open(`http://localhost:8000/static/sentiment_analysis_dashboard.png`, '_blank')}
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     View Full Size
@@ -138,7 +138,7 @@ const DashboardDisplay = () => {
                     </div>
                   )}
                   <img
-                    src={apiService.getDashboardImageUrl()}
+                    src={`http://localhost:8000/static/sentiment_analysis_dashboard.png?t=${Date.now()}`}
                     alt="Sentiment Analysis Dashboard"
                     className={`w-full h-auto rounded-lg shadow-lg transition-opacity duration-300 ${
                       dashboardLoaded ? 'opacity-100' : 'opacity-0'

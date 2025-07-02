@@ -464,15 +464,46 @@ def main():
     analyzer.print_final_summary(success)
 
 if __name__ == "__main__":
-    # Set console encoding to UTF-8 to handle Unicode paths
+    # Set console encoding to UTF-8 to handle Unicode paths and characters
     import sys
     import io
+    import os
     
-    # Ensure stdout can handle Unicode characters
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    elif hasattr(sys.stdout, 'buffer'):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    # Set environment variable for UTF-8 encoding
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+    
+    # Ensure stdout can handle Unicode characters safely
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        elif hasattr(sys.stdout, 'buffer'):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        # Fallback: use safe ASCII-only output
+        pass
+    
+    # Override print function to handle Unicode safely
+    original_print = print
+    
+    def safe_print(*args, **kwargs):
+        try:
+            # Convert all args to safe strings
+            safe_args = []
+            for arg in args:
+                try:
+                    # Try to encode as ASCII first, replace problematic characters
+                    safe_str = str(arg).encode('ascii', errors='replace').decode('ascii')
+                    safe_args.append(safe_str)
+                except Exception:
+                    # If that fails, use repr for safe representation
+                    safe_args.append(repr(arg))
+            original_print(*safe_args, **kwargs)
+        except Exception as e:
+            # Ultimate fallback
+            original_print("Output encoding error:", str(e))
+    
+    # Replace print function
+    print = safe_print
     
     try:
         main()

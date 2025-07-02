@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Play, Square, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Play, Square, RefreshCw, Wifi, WifiOff, BarChart3, CheckCircle } from 'lucide-react';
+import DashboardDisplay from '@/components/DashboardDisplay';
 
 interface AnalysisState {
   status: string;
@@ -17,7 +18,7 @@ interface AnalysisState {
     total_comments: number;
   };
   error?: string;
-  logs: string[];
+  logs: Array<string | { message: string; timestamp: string }>;
 }
 
 interface RealTimeLoggerProps {
@@ -39,6 +40,7 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
   
   const [isConnected, setIsConnected] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [inputChannelId, setInputChannelId] = useState(channelId || '');
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -47,54 +49,85 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
   // WebSocket connection
   useEffect(() => {
     const connectWebSocket = () => {
-      // Use relative WebSocket URL when in development with proxy
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = process.env.NODE_ENV === 'production' 
-        ? `${protocol}//${window.location.host}/ws/analysis`
-        : `ws://localhost:8000/ws/analysis`;
+      // Construct WebSocket URL based on environment
+      let wsUrl: string;
+      
+      if (process.env.NODE_ENV === 'production') {
+        // In production, use same host with appropriate protocol
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/ws/analysis`;
+      } else {
+        // In development, connect directly to backend server
+        wsUrl = 'ws://localhost:8000/ws/analysis';
+      }
+      
+      console.log('Attempting WebSocket connection to:', wsUrl);
       
       try {
         wsRef.current = new WebSocket(wsUrl);
         
         wsRef.current.onopen = () => {
-          console.log('WebSocket connected to:', wsUrl);
+          console.log('WebSocket connected successfully to:', wsUrl);
           setIsConnected(true);
         };
         
         wsRef.current.onmessage = (event) => {
           try {
             const data: AnalysisState = JSON.parse(event.data);
-            setAnalysisState(data);
+            console.log('WebSocket received:', data); // Debug log
+            
+            setAnalysisState(prevState => {
+              // Properly merge new data with existing state
+              const newState = {
+                ...prevState,
+                ...data,
+                // Always use logs from incoming data if present, otherwise keep existing
+                logs: Array.isArray(data.logs) ? data.logs : prevState.logs
+              };
+              console.log('Updated analysis state:', newState); // Debug log
+              return newState;
+            });
             
             // Auto-scroll to bottom when new logs arrive
-            if (scrollAreaRef.current) {
+            if (scrollAreaRef.current && data.logs && data.logs.length > 0) {
               setTimeout(() => {
-                scrollAreaRef.current?.scrollTo({
-                  top: scrollAreaRef.current.scrollHeight,
-                  behavior: 'smooth'
-                });
+                const scrollArea = scrollAreaRef.current;
+                if (scrollArea) {
+                  scrollArea.scrollTop = scrollArea.scrollHeight;
+                }
               }, 100);
             }
             
             // Handle analysis completion
-            if (data.status === 'completed' && onAnalysisComplete) {
-              onAnalysisComplete(data);
+            if (data.status === 'completed') {
+              console.log('Analysis completed!'); // Debug log
+              setIsCompleted(true);
               setIsAnalyzing(false);
+              if (onAnalysisComplete) {
+                onAnalysisComplete(data);
+              }
             }
             
             if (data.status === 'error') {
+              console.log('Analysis error:', data.error); // Debug log
               setIsAnalyzing(false);
             }
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
+            console.error('Raw message:', event.data);
           }
         };
         
         wsRef.current.onclose = () => {
-          console.log('WebSocket disconnected');
+          console.log('WebSocket disconnected from:', wsUrl);
           setIsConnected(false);
           // Attempt to reconnect after 3 seconds
-          setTimeout(connectWebSocket, 3000);
+          setTimeout(() => {
+            if (!isCompleted) { // Only reconnect if analysis is not completed
+              console.log('Attempting to reconnect WebSocket...');
+              connectWebSocket();
+            }
+          }, 3000);
         };
         
         wsRef.current.onerror = (error) => {
@@ -152,6 +185,28 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
     }
   };
 
+  const testWebSocket = async () => {
+    try {
+      const apiUrl = process.env.NODE_ENV === 'production' 
+        ? '/api/test-websocket' 
+        : 'http://localhost:8000/api/test-websocket';
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('WebSocket test result:', result);
+      }
+    } catch (error) {
+      console.error('Error testing WebSocket:', error);
+    }
+  };
+
   const stopAnalysis = async () => {
     try {
       const apiUrl = process.env.NODE_ENV === 'production' 
@@ -176,11 +231,59 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
     }
   };
 
+  const startNewAnalysis = () => {
+    setIsCompleted(false);
+    setAnalysisState({
+      status: 'idle',
+      step: '',
+      message: '',
+      progress: 0,
+      logs: []
+    });
+  };
+
   const getStatusIcon = () => {
     if (isAnalyzing) return <RefreshCw className="h-4 w-4 animate-spin" />;
     return analysisState.status === 'completed' ? '✅' : '⏸️';
   };
 
+  // If analysis is completed, show dashboard only
+  if (isCompleted) {
+    return (
+      <div className="space-y-6">
+        {/* Completion Header */}
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <CheckCircle className="h-6 w-6" />
+              Analysis Complete!
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-green-700">
+                Your YouTube channel analysis has been completed successfully. 
+                View the comprehensive dashboard below.
+              </div>
+              <Button 
+                onClick={startNewAnalysis}
+                variant="outline"
+                className="border-green-600 text-green-700 hover:bg-green-100"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                New Analysis
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dashboard Display */}
+        <DashboardDisplay />
+      </div>
+    );
+  }
+
+  // Analysis UI (shown when not completed)
   return (
     <div className="space-y-4">
       {/* Control Panel */}
@@ -231,6 +334,46 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
                 Stop
               </Button>
             )}
+            
+            {/* Debug WebSocket Test Button */}
+            <Button 
+              onClick={async () => {
+                try {
+                  const response = await fetch(
+                    process.env.NODE_ENV === 'production' 
+                      ? '/api/test-websocket' 
+                      : 'http://localhost:8000/api/test-websocket',
+                    { method: 'POST' }
+                  );
+                  const result = await response.json();
+                  console.log('WebSocket test result:', result);
+                  alert(`WebSocket test: ${result.status} - ${result.message}`);
+                } catch (error) {
+                  console.error('WebSocket test failed:', error);
+                  alert('WebSocket test failed');
+                }
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Test WS
+            </Button>
+          </div>
+          
+          {/* Debug controls */}
+          <div className="flex gap-2 pt-2 border-t border-gray-200">
+            <Button 
+              onClick={testWebSocket}
+              variant="outline"
+              size="sm"
+              disabled={!isConnected}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Test Connection
+            </Button>
+            <span className="text-xs text-gray-500 flex items-center">
+              Debug: Test real-time updates
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -305,23 +448,31 @@ const RealTimeLogger: React.FC<RealTimeLoggerProps> = ({
               {analysisState.logs.length === 0 ? (
                 <div className="text-gray-500 italic">No logs yet...</div>
               ) : (
-                analysisState.logs.map((log, index) => (
-                  <div 
-                    key={index} 
-                    className={`${
-                      log.startsWith('ERROR:') 
-                        ? 'text-red-600' 
-                        : log.startsWith('PROGRESS:')
-                        ? 'text-blue-600 font-medium'
-                        : 'text-gray-700'
-                    }`}
-                  >
-                    <span className="text-gray-400">
-                      [{new Date().toLocaleTimeString()}]
-                    </span>{' '}
-                    {log}
-                  </div>
-                ))
+                analysisState.logs.map((log, index) => {
+                  // Handle both string and object log formats
+                  const logText = typeof log === 'string' ? log : log.message;
+                  const logTime = typeof log === 'string' 
+                    ? new Date().toLocaleTimeString() 
+                    : new Date(log.timestamp).toLocaleTimeString();
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className={`${
+                        logText.startsWith('ERROR:') 
+                          ? 'text-red-600' 
+                          : logText.startsWith('PROGRESS:')
+                          ? 'text-blue-600 font-medium'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      <span className="text-gray-400">
+                        [{logTime}]
+                      </span>{' '}
+                      {logText}
+                    </div>
+                  );
+                })
               )}
             </div>
           </ScrollArea>
