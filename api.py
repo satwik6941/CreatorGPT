@@ -19,7 +19,23 @@ import io
 import contextlib
 import glob
 from collections import Counter
-from datetime import datetime
+
+def safe_print(message: str):
+    """
+    Safely print messages that may contain Unicode characters.
+    Handles console encoding issues by replacing problematic characters.
+    """
+    try:
+        # Try to print normally first
+        print(message)
+    except UnicodeEncodeError:
+        try:
+            # Replace problematic Unicode characters for console output
+            safe_message = str(message).encode('ascii', 'replace').decode('ascii')
+            print(safe_message)
+        except Exception:
+            # Last resort: print a simplified message
+            print("[MESSAGE CONTAINS UNICODE CHARACTERS - CONTENT SUPPRESSED]")
 
 app = FastAPI(title="CreatorGPT API", version="1.0.0")
 
@@ -191,10 +207,14 @@ async def broadcast_analysis_update():
             serializable_state["channel_info"] = serializable_state["channel_info"].__dict__
         
         message = json.dumps(serializable_state)
-        print(f"[DEBUG] Broadcasting to {len(manager.active_connections)} clients: {serializable_state.get('message', 'No message')}")
+        
+        # Safe print for Unicode characters - avoid console encoding issues
+        debug_message = serializable_state.get('message', 'No message')
+        safe_print(f"[DEBUG] Broadcasting to {len(manager.active_connections)} clients: {debug_message}")
+        
         await manager.broadcast(message)
     except Exception as e:
-        print(f"[ERROR] Error broadcasting update: {e}")
+        safe_print(f"[ERROR] Error broadcasting update: {e}")
         import traceback
         traceback.print_exc()
 
@@ -226,7 +246,7 @@ def update_analysis_state(updates: dict):
     analysis_state.update(updates)
     
     # Print debug info
-    print(f"[DEBUG] Analysis state updated: {updates}")
+    safe_print(f"[DEBUG] Analysis state updated: {updates}")
     
     # Try to broadcast using asyncio if possible
     try:

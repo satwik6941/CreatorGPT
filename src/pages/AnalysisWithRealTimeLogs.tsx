@@ -3,11 +3,25 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import RealTimeAnalysis from '@/components/RealTimeAnalysis';
 import FullScreenDashboard from '@/components/FullScreenDashboard';
 
+interface AnalysisData {
+  channel_info?: {
+    channel_name: string;
+    subscriber_count: string;
+    total_comments: number;
+  };
+  sentiment_summary?: {
+    positive: number;
+    negative: number;
+    neutral: number;
+  };
+  // Add other properties as needed
+}
+
 const AnalysisWithRealTimeLogs = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [showDashboard, setShowDashboard] = useState(false);
-  const [analysisData, setAnalysisData] = useState(null);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   
   const channelId = searchParams.get('channelId');
 
@@ -18,7 +32,7 @@ const AnalysisWithRealTimeLogs = () => {
     }
   }, [channelId, navigate]);
 
-  const handleAnalysisComplete = (data: any) => {
+  const handleAnalysisComplete = (data: AnalysisData) => {
     setAnalysisData(data);
     setShowDashboard(true);
   };

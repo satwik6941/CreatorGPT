@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,8 +33,22 @@ interface AnalysisProgress {
   logs?: string[];
 }
 
+interface AnalysisData {
+  channel_info?: {
+    channel_name: string;
+    subscriber_count: string;
+    total_comments: number;
+  };
+  sentiment_summary?: {
+    positive: number;
+    negative: number;
+    neutral: number;
+  };
+  // Add other properties as needed
+}
+
 interface Props {
-  onAnalysisComplete?: (data: any) => void;
+  onAnalysisComplete?: (data: AnalysisData) => void;
 }
 
 const RealTimeAnalysis: React.FC<Props> = ({ onAnalysisComplete }) => {
@@ -51,65 +65,7 @@ const RealTimeAnalysis: React.FC<Props> = ({ onAnalysisComplete }) => {
   const wsRef = useRef<WebSocket | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
-  // Auto-start analysis if channel ID is provided in URL
-  useEffect(() => {
-    const urlChannelId = searchParams.get('channelId');
-    if (urlChannelId && !isAnalyzing) {
-      setChannelId(urlChannelId);
-      // Start analysis automatically after a short delay
-      setTimeout(() => {
-        startAnalysis(urlChannelId);
-      }, 1000);
-    }
-  }, [searchParams]);
-
-  // WebSocket connection for real-time updates
-  useEffect(() => {
-    if (isAnalyzing) {
-      console.log('Establishing WebSocket connection...');
-      const ws = apiService.createWebSocket(
-        (data) => {
-          console.log('Received WebSocket data:', data);
-          setAnalysisState(data);
-          
-          // Add new log entries
-          if (data.message) {
-            setLogs(prev => [...prev.slice(-50), `[${new Date().toLocaleTimeString()}] ${data.message}`]);
-          }
-          
-          // Check if analysis is complete
-          if (data.status === 'completed' && data.progress >= 100) {
-            setIsAnalyzing(false);
-            setTimeout(() => {
-              if (onAnalysisComplete) {
-                onAnalysisComplete(data);
-              }
-            }, 2000); // Show completion for 2 seconds before transitioning
-          } else if (data.status === 'error') {
-            setIsAnalyzing(false);
-          }
-        },
-        (error) => {
-          console.error('WebSocket error:', error);
-          setAnalysisState(prev => ({
-            ...prev,
-            status: 'error',
-            error: 'Connection error. Please check your network and try again.'
-          }));
-        }
-      );
-      
-      wsRef.current = ws;
-      
-      return () => {
-        if (ws) {
-          ws.close();
-        }
-      };
-    }
-  }, [isAnalyzing, onAnalysisComplete]);
-
-  const startAnalysis = async (channelIdToUse?: string) => {
+  const startAnalysis = useCallback(async (channelIdToUse?: string) => {
     const idToUse = channelIdToUse || channelId;
     if (!idToUse.trim()) {
       return;
@@ -136,7 +92,74 @@ const RealTimeAnalysis: React.FC<Props> = ({ onAnalysisComplete }) => {
       }));
       setIsAnalyzing(false);
     }
-  };
+  }, [channelId]);
+
+  // Auto-start analysis if channel ID is provided in URL
+  useEffect(() => {
+    const urlChannelId = searchParams.get('channelId');
+    if (urlChannelId && !isAnalyzing) {
+      setChannelId(urlChannelId);
+      // Start analysis automatically after a short delay
+      setTimeout(() => {
+        startAnalysis(urlChannelId);
+      }, 1000);
+    }
+  }, [searchParams, isAnalyzing, startAnalysis]);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (isAnalyzing) {
+      console.log('Establishing WebSocket connection...');
+      const ws = apiService.createWebSocket(
+        (data) => {
+          console.log('Received WebSocket data:', data);
+          setAnalysisState(data);
+          
+          // Add new log entries
+          if (data.message) {
+            setLogs(prev => [...prev.slice(-50), `[${new Date().toLocaleTimeString()}] ${data.message}`]);
+          }
+          
+          // Check if analysis is complete
+          if (data.status === 'completed' && data.progress >= 100) {
+            setIsAnalyzing(false);
+            setTimeout(() => {
+              if (onAnalysisComplete) {
+                // Map WebSocketMessage to AnalysisData
+                const analysisData: AnalysisData = {
+                  channel_info: data.channel_info,
+                  sentiment_summary: {
+                    positive: 0,
+                    negative: 0,
+                    neutral: 0
+                  }
+                };
+                onAnalysisComplete(analysisData);
+              }
+            }, 2000); // Show completion for 2 seconds before transitioning
+          } else if (data.status === 'error') {
+            setIsAnalyzing(false);
+          }
+        },
+        (error) => {
+          console.error('WebSocket error:', error);
+          setAnalysisState(prev => ({
+            ...prev,
+            status: 'error',
+            error: 'Connection error. Please check your network and try again.'
+          }));
+        }
+      );
+      
+      wsRef.current = ws;
+      
+      return () => {
+        if (ws) {
+          ws.close();
+        }
+      };
+    }
+  }, [isAnalyzing, onAnalysisComplete]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isAnalyzing) {

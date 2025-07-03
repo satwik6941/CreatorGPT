@@ -40,7 +40,7 @@ export const apiService = {
   },
 
   // WebSocket connection for real-time updates
-  createWebSocket(onMessage: (data: any) => void, onError?: (error: Event) => void) {
+  createWebSocket(onMessage: (data: WebSocketMessage) => void, onError?: (error: Event) => void) {
     const ws = new WebSocket(`ws://localhost:8000/ws/analysis`);
     
     ws.onopen = () => {
@@ -75,6 +75,24 @@ export const apiService = {
 export default apiService;
 
 // Types for API responses
+export interface WebSocketMessage extends AnalysisProgress {
+  type?: string;
+}
+
+export interface AnalysisProgress {
+  status: 'idle' | 'running' | 'completed' | 'error';
+  step: string;
+  message: string;
+  progress: number;
+  channel_info?: {
+    channel_name: string;
+    subscriber_count: string;
+    total_comments: number;
+  };
+  error?: string;
+  logs?: string[];
+}
+
 export interface AnalysisResponse {
   status: string;
   message: string;

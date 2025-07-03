@@ -67,20 +67,26 @@ interface FullScreenDashboardProps {
 }
 
 const COLORS = {
-  positive: '#10B981',
-  negative: '#EF4444', 
-  neutral: '#6B7280',
-  primary: '#3B82F6',
-  secondary: '#8B5CF6',
+  positive: '#30FF30',  // neon-green
+  negative: '#FF3B30',  // bright-red  
+  neutral: '#00D4FF',   // electric-blue
+  primary: '#00D4FF',   // electric-blue
+  secondary: '#8B5CF6', 
   accent: '#F59E0B',
-  success: '#059669',
-  warning: '#D97706',
-  info: '#0284C7',
-  background: '#F8FAFC',
-  cardBg: '#FFFFFF',
-  textPrimary: '#1F2937',
-  textSecondary: '#6B7280',
-  border: '#E5E7EB'
+  success: '#22C55E',
+  warning: '#F59E0B',
+  info: '#00D4FF',
+  background: '#000000', // deep-black
+  cardBg: '#1A1A1A',    // dark-surface
+  textPrimary: '#FFFFFF',
+  textSecondary: '#B0B0B0',
+  border: 'rgba(255, 255, 255, 0.08)',
+  glass: 'rgba(255, 255, 255, 0.03)',
+  chart: {
+    grid: 'rgba(255, 255, 255, 0.1)',
+    text: '#B0B0B0',
+    axis: 'rgba(255, 255, 255, 0.2)'
+  }
 };
 
 const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis }) => {
@@ -170,11 +176,11 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Loading Dashboard</h2>
-          <p className="text-gray-600">Preparing your analytics...</p>
+          <RefreshCw className="h-12 w-12 animate-spin text-electric-blue mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold text-white mb-2">Loading Dashboard</h2>
+          <p className="text-gray-400">Preparing your analytics...</p>
         </div>
       </div>
     );
@@ -182,18 +188,18 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
 
   if (error && !dashboardData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="bg-red-100 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <BarChart3 className="h-8 w-8 text-red-600" />
+          <div className="bg-bright-red/20 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center border border-bright-red/30">
+            <BarChart3 className="h-8 w-8 text-bright-red" />
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Dashboard Error</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={fetchDashboardData} className="mr-3">
+          <h2 className="text-2xl font-semibold text-white mb-2">Dashboard Error</h2>
+          <p className="text-gray-400 mb-4">{error}</p>
+          <Button onClick={fetchDashboardData} className="mr-3 bg-electric-blue hover:bg-electric-blue/90 text-black">
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
-          <Button onClick={onNewAnalysis} variant="outline">
+          <Button onClick={onNewAnalysis} variant="outline" className="border-electric-blue text-electric-blue hover:bg-electric-blue hover:text-black">
             New Analysis
           </Button>
         </div>
@@ -202,23 +208,23 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-black">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="glass-effect border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <div className="bg-red-600 p-3 rounded-lg">
-                <Youtube className="h-8 w-8 text-white" />
+              <div className="bg-gradient-to-r from-electric-blue to-bright-red p-3 rounded-lg">
+                <Youtube className="h-8 w-8 text-black" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Dashboard & Analytics</h1>
-                <p className="text-gray-600 mt-1">
+                <h1 className="text-3xl font-bold text-white">Dashboard & Analytics</h1>
+                <p className="text-gray-400 mt-1">
                   Comprehensive insights for {dashboardData?.channel_name || 'Your Channel'}
                 </p>
               </div>
             </div>
-            <Button onClick={onNewAnalysis} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={onNewAnalysis} className="bg-electric-blue hover:bg-electric-blue/90 text-black font-semibold glow-button">
               <BarChart3 className="h-4 w-4 mr-2" />
               New Analysis
             </Button>
@@ -231,59 +237,59 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
         
         {/* Channel Overview Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <Users className="h-6 w-6 mr-2 text-blue-600" />
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
+            <Users className="h-6 w-6 mr-2 text-electric-blue" />
             Channel Overview
           </h2>
           
           {/* Channel Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="border-l-4 border-l-blue-500">
+            <Card className="glass-card border-l-4 border-l-electric-blue">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Channel Name</CardTitle>
-                <Youtube className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Channel Name</CardTitle>
+                <Youtube className="h-4 w-4 text-electric-blue" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{dashboardData?.channel_name}</div>
+                <div className="text-2xl font-bold text-white">{dashboardData?.channel_name}</div>
                 <p className="text-xs text-gray-500 mt-1">Active since {dashboardData?.channel_created}</p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-green-500">
+            <Card className="glass-card border-l-4 border-l-neon-green">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Subscribers</CardTitle>
-                <Users className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Subscribers</CardTitle>
+                <Users className="h-4 w-4 text-neon-green" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{dashboardData?.subscriber_count}</div>
-                <p className="text-xs text-green-600 flex items-center mt-1">
+                <div className="text-2xl font-bold text-white">{dashboardData?.subscriber_count}</div>
+                <p className="text-xs text-neon-green flex items-center mt-1">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   Growing audience
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-purple-500">
+            <Card className="glass-card border-l-4 border-l-purple-400">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Videos</CardTitle>
-                <Eye className="h-4 w-4 text-purple-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Total Videos</CardTitle>
+                <Eye className="h-4 w-4 text-purple-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{dashboardData?.total_videos}</div>
+                <div className="text-2xl font-bold text-white">{dashboardData?.total_videos}</div>
                 <p className="text-xs text-gray-500 mt-1">Content library</p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-orange-500">
+            <Card className="glass-card border-l-4 border-l-orange-400">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Views</CardTitle>
-                <TrendingUp className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Total Views</CardTitle>
+                <TrendingUp className="h-4 w-4 text-orange-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold text-white">
                   {dashboardData?.total_views?.toLocaleString() || '0'}
                 </div>
-                <p className="text-xs text-orange-600 flex items-center mt-1">
+                <p className="text-xs text-orange-400 flex items-center mt-1">
                   <Eye className="h-3 w-3 mr-1" />
                   Lifetime views
                 </p>
@@ -293,27 +299,27 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
 
           {/* Engagement Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <Card className="border-l-4 border-l-red-500">
+            <Card className="glass-card border-l-4 border-l-bright-red">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Comments</CardTitle>
-                <MessageSquare className="h-4 w-4 text-red-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Total Comments</CardTitle>
+                <MessageSquare className="h-4 w-4 text-bright-red" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900">{dashboardData?.total_comments.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-white">{dashboardData?.total_comments.toLocaleString()}</div>
                 <p className="text-xs text-gray-500 mt-1">Comments analyzed</p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-pink-500">
+            <Card className="glass-card border-l-4 border-l-pink-400">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Overall Sentiment</CardTitle>
-                <Heart className="h-4 w-4 text-pink-600" />
+                <CardTitle className="text-sm font-medium text-gray-400">Overall Sentiment</CardTitle>
+                <Heart className="h-4 w-4 text-pink-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900">
+                <div className="text-3xl font-bold text-white">
                   {((dashboardData?.avg_sentiment_score || 0) * 100).toFixed(1)}%
                 </div>
-                <p className="text-xs text-pink-600 flex items-center mt-1">
+                <p className="text-xs text-pink-400 flex items-center mt-1">
                   <ThumbsUp className="h-3 w-3 mr-1" />
                   {(dashboardData?.avg_sentiment_score || 0) > 0.6 ? 'Positive Community' : 'Mixed Sentiment'}
                 </p>
@@ -324,19 +330,19 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
 
         {/* Analytics Charts Section */}
         <div className="space-y-8">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <BarChart3 className="h-6 w-6 mr-2 text-blue-600" />
+          <h2 className="text-2xl font-bold text-white flex items-center">
+            <BarChart3 className="h-6 w-6 mr-2 text-electric-blue" />
             Analytics & Insights
           </h2>
 
           {/* Sentiment Analysis Chart */}
-          <Card className="shadow-lg">
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Heart className="h-5 w-5 text-pink-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-white">
+                <Heart className="h-5 w-5 text-pink-400" />
                 Sentiment Distribution
               </CardTitle>
-              <p className="text-gray-600">Analysis of comment sentiment across your content</p>
+              <p className="text-gray-400">Analysis of comment sentiment across your content</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -364,7 +370,15 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: any) => [value.toLocaleString(), 'Comments']} />
+                      <Tooltip 
+                        formatter={(value: number) => [value.toLocaleString(), 'Comments']}
+                        contentStyle={{
+                          backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          color: '#ffffff'
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -372,7 +386,7 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
                 {/* Summary Stats */}
                 <div className="flex flex-col justify-center space-y-4">
                   {dashboardData?.sentiment_distribution.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                    <div key={index} className="flex items-center justify-between p-3 rounded-lg glass-effect">
                       <div className="flex items-center space-x-3">
                         <div 
                           className="w-4 h-4 rounded-full"
@@ -382,11 +396,11 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
                                            COLORS.neutral
                           }}
                         />
-                        <span className="font-medium">{item.sentiment}</span>
+                        <span className="font-medium text-white">{item.sentiment}</span>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{item.count.toLocaleString()}</div>
-                        <div className="text-sm text-gray-500">{item.percentage}%</div>
+                        <div className="font-bold text-white">{item.count.toLocaleString()}</div>
+                        <div className="text-sm text-gray-400">{item.percentage}%</div>
                       </div>
                     </div>
                   ))}
@@ -396,22 +410,32 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
           </Card>
 
           {/* Engagement Over Time Chart */}
-          <Card className="shadow-lg">
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-white">
+                <TrendingUp className="h-5 w-5 text-electric-blue" />
                 Engagement Trends Over Time
               </CardTitle>
-              <p className="text-gray-600">Monthly performance across key metrics</p>
+              <p className="text-gray-400">Monthly performance across key metrics</p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
                 <AreaChart data={dashboardData?.engagement_over_time}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip formatter={(value: any) => [value.toLocaleString()]} />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="date" tick={{ fill: COLORS.chart.text }} />
+                  <YAxis tick={{ fill: COLORS.chart.text }} />
+                  <Tooltip 
+                    formatter={(value: number) => [value.toLocaleString()]}
+                    contentStyle={{
+                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff'
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ color: COLORS.chart.text }}
+                  />
                   <Area 
                     type="monotone" 
                     dataKey="views" 
@@ -442,13 +466,13 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
           </Card>
 
           {/* Top Keywords Chart */}
-          <Card className="shadow-lg">
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-green-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-white">
+                <MessageSquare className="h-5 w-5 text-neon-green" />
                 Most Popular Keywords
               </CardTitle>
-              <p className="text-gray-600">Words most frequently used in comments</p>
+              <p className="text-gray-400">Words most frequently used in comments</p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
@@ -457,10 +481,18 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
                   layout="horizontal"
                   margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="keyword" type="category" width={80} />
-                  <Tooltip formatter={(value: any) => [value, 'Mentions']} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis type="number" tick={{ fill: COLORS.chart.text }} />
+                  <YAxis dataKey="keyword" type="category" width={80} tick={{ fill: COLORS.chart.text }} />
+                  <Tooltip 
+                    formatter={(value: number) => [value, 'Mentions']}
+                    contentStyle={{
+                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff'
+                    }}
+                  />
                   <Bar 
                     dataKey="count" 
                     fill={COLORS.secondary}
@@ -472,26 +504,33 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
           </Card>
 
           {/* Comment Activity by Hour */}
-          <Card className="shadow-lg">
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-white">
+                <Clock className="h-5 w-5 text-orange-400" />
                 Daily Activity Patterns
               </CardTitle>
-              <p className="text-gray-600">When your audience is most active throughout the day</p>
+              <p className="text-gray-400">When your audience is most active throughout the day</p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={dashboardData?.comment_trends}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
                   <XAxis 
                     dataKey="hour" 
                     tickFormatter={(hour) => `${hour}:00`}
+                    tick={{ fill: COLORS.chart.text }}
                   />
-                  <YAxis />
+                  <YAxis tick={{ fill: COLORS.chart.text }} />
                   <Tooltip 
                     labelFormatter={(hour) => `${hour}:00`}
-                    formatter={(value: any) => [value, 'Comments']}
+                    formatter={(value: number) => [value, 'Comments']}
+                    contentStyle={{
+                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff'
+                    }}
                   />
                   <Line 
                     type="monotone" 
@@ -507,23 +546,31 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
           </Card>
 
           {/* Growth Chart */}
-          <Card className="shadow-lg">
+          <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
+              <CardTitle className="text-xl flex items-center gap-2 text-white">
+                <TrendingUp className="h-5 w-5 text-purple-400" />
                 Channel Growth Over Time
               </CardTitle>
-              <p className="text-gray-600">Subscriber and view growth progression</p>
+              <p className="text-gray-400">Subscriber and view growth progression</p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={dashboardData?.monthly_growth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip formatter={(value: any) => [value.toLocaleString()]} />
-                  <Legend />
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" tick={{ fill: COLORS.chart.text }} />
+                  <YAxis yAxisId="left" tick={{ fill: COLORS.chart.text }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: COLORS.chart.text }} />
+                  <Tooltip 
+                    formatter={(value: number) => [value.toLocaleString()]}
+                    contentStyle={{
+                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ color: COLORS.chart.text }} />
                   <Line 
                     yAxisId="left"
                     type="monotone" 
@@ -547,18 +594,18 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
         </div>
         
         {/* Summary Footer */}
-        <Card className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 border-none shadow-lg">
+        <Card className="mt-8 glass-effect border border-electric-blue/30">
           <CardContent className="pt-6">
             <div className="text-center">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Analysis Complete!</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-2xl font-bold text-white mb-4">Analysis Complete!</h3>
+              <p className="text-gray-400 mb-6">
                 Your channel shows strong engagement with a positive community sentiment. 
                 Keep creating great content to maintain this momentum!
               </p>
               <Button 
                 onClick={onNewAnalysis}
                 size="lg"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="bg-gradient-to-r from-electric-blue to-bright-red hover:from-electric-blue/90 hover:to-bright-red/90 text-black font-semibold glow-button"
               >
                 <BarChart3 className="h-5 w-5 mr-2" />
                 Analyze Another Channel

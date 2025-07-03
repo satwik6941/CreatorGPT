@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
 import CreatorProfile from "./pages/CreatorProfile";
 import Analysis from "./pages/Analysis";
 import AnalysisWithRealTimeLogs from "./pages/AnalysisWithRealTimeLogs";
@@ -24,7 +23,6 @@ const App = () => (
           <Route path="/creator-profile" element={<CreatorProfile />} />
           <Route path="/analysis" element={<Analysis />} />
           <Route path="/analysis-realtime" element={<AnalysisWithRealTimeLogs />} />
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
