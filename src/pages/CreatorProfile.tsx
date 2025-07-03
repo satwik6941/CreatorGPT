@@ -21,7 +21,7 @@ const CreatorProfile = () => {
     e.preventDefault();
     if (channelId.trim()) {
       console.log("Channel ID:", channelId);
-      navigate(`/analysis?channelId=${encodeURIComponent(channelId)}`);
+      navigate(`/analysis-realtime?channelId=${encodeURIComponent(channelId)}`);
     }
   };
 
