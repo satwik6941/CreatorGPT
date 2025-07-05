@@ -39,6 +39,17 @@ export const apiService = {
     }
   },
 
+  // Get real batch analysis data
+  async getBatchAnalysis() {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/batch-analysis`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get batch analysis:', error);
+      throw error;
+    }
+  },
+
   // WebSocket connection for real-time updates
   createWebSocket(onMessage: (data: WebSocketMessage) => void, onError?: (error: Event) => void) {
     const ws = new WebSocket(`ws://localhost:8000/ws/analysis`);

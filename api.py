@@ -1437,3 +1437,305 @@ async def get_dashboard_data():
     except Exception as e:
         print(f"Error generating dashboard data: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating dashboard data: {str(e)}")
+
+@app.post("/api/cleanup-files")
+async def cleanup_files():
+    """
+    Cleanup generated files when user leaves the page
+    """
+    try:
+        deleted_files = []
+        
+        # Define patterns for files to delete - comprehensive cleanup
+        file_patterns = [
+            # CSV files
+            'all_comments.csv',
+            'cleaned_all_comments.csv', 
+            'comments_*.csv',
+            '*.csv',  # All CSV files
+            # Text files
+            'comments_batch_*.txt',
+            'analyzed_comments_batch_*.txt',
+            '*.txt',  # All text files
+            # Image files
+            'charts/*.png',
+            'charts/*.jpg', 
+            'charts/*.jpeg',
+            'charts/*.gif',
+            'charts/*.bmp',
+            'charts/*.webp',
+            'score_distribution.*',
+            'sentiment_pie_chart.*',
+            '*.png',  # All PNG files
+            '*.jpg',  # All JPG files
+            '*.jpeg', # All JPEG files
+            '*.gif',  # All GIF files
+            '*.bmp',  # All BMP files
+            '*.webp', # All WebP files
+            # JSON files
+            'batch_processing_status.json',
+            'llm_processing_status.json',
+            'analysis_*.json',
+            'results_*.json',
+            '*.json',  # All JSON files (except package.json and config files)
+            # Temporary files
+            '*.tmp',
+            '*.temp',
+            '*.log',
+            # Other generated files
+            '*.pkl',
+            '*.pickle',
+            '*.cache'
+        ]
+        
+        # Files to exclude from deletion (important system files)
+        exclude_files = [
+            'package.json',
+            'package-lock.json',
+            'tsconfig.json',
+            'tsconfig.app.json', 
+            'tsconfig.node.json',
+            'vite.config.ts',
+            'tailwind.config.ts',
+            'postcss.config.js',
+            'eslint.config.js',
+            'components.json',
+            'requirements.txt',
+            'api.py',
+            'main.py',
+            'run_api.py',
+            'run_api_dev.py'
+        ]
+        
+        # Delete files matching patterns
+        for pattern in file_patterns:
+            for file_path in glob.glob(pattern):
+                try:
+                    # Skip if it's an excluded file
+                    if os.path.basename(file_path) in exclude_files:
+                        continue
+                    
+                    # Skip if it's in node_modules, .git, or src directories
+                    if any(excluded_dir in file_path for excluded_dir in ['node_modules', '.git', 'src', '.vscode', '__pycache__']):
+                        continue
+                        
+                    if os.path.exists(file_path) and os.path.isfile(file_path):
+                        os.remove(file_path)
+                        deleted_files.append(file_path)
+                        safe_print(f"Deleted: {file_path}")
+                except Exception as e:
+                    safe_print(f"Error deleting {file_path}: {e}")
+        
+        # Clean up charts directory
+        charts_dir = 'charts'
+        if os.path.exists(charts_dir):
+            try:
+                for file in os.listdir(charts_dir):
+                    file_path = os.path.join(charts_dir, file)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        deleted_files.append(file_path)
+                        safe_print(f"Deleted chart file: {file_path}")
+            except Exception as e:
+                safe_print(f"Error cleaning charts directory: {e}")
+        
+        # Clean up any output or temp directories
+        temp_dirs = ['output', 'temp', 'tmp', 'cache']
+        for temp_dir in temp_dirs:
+            if os.path.exists(temp_dir):
+                try:
+                    for file in os.listdir(temp_dir):
+                        file_path = os.path.join(temp_dir, file)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(file_path)
+                            safe_print(f"Deleted temp file: {file_path}")
+                except Exception as e:
+                    safe_print(f"Error cleaning {temp_dir} directory: {e}")
+        
+        safe_print(f"Cleanup completed. Deleted {len(deleted_files)} files.")
+        
+        return JSONResponse(content={
+            'success': True,
+            'message': f'Successfully deleted {len(deleted_files)} files',
+            'deleted_files': deleted_files
+        })
+        
+    except Exception as e:
+        safe_print(f"Error during file cleanup: {e}")
+        raise HTTPException(status_code=500, detail=f"Error during cleanup: {str(e)}")
+
+@app.get("/api/batch-analysis")
+async def get_batch_analysis():
+    """
+    Read and parse all analyzed_comments_batch_*.txt files to provide real analytics data
+    """
+    try:
+        batch_files = glob.glob("analyzed_comments_batch_*.txt")
+        batch_files.sort()  # Sort to ensure proper order
+        
+        if not batch_files:
+            raise HTTPException(status_code=404, detail="No batch analysis files found")
+        
+        analyses = []
+        channel_name = "Unknown Channel"
+        total_comments = 0
+        overall_positive = 0
+        overall_neutral = 0
+        overall_negative = 0
+        
+        for batch_file in batch_files:
+            try:
+                with open(batch_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Extract batch number from filename
+                batch_num = int(batch_file.split('_')[-1].replace('.txt', ''))
+                
+                # Parse the content to extract structured data
+                analysis = parse_batch_analysis(content, batch_num)
+                if analysis:
+                    analyses.append(analysis)
+                    total_comments += analysis.get('totalComments', 0)
+                    overall_positive += analysis.get('positivePercentage', 0)
+                    overall_neutral += analysis.get('neutralPercentage', 0)
+                    overall_negative += analysis.get('negativePercentage', 0)
+                    
+                    # Try to extract channel name from analysis
+                    if 'TechWiser' in content or 'techwiser' in content.lower():
+                        channel_name = "TechWiser"
+                        
+            except Exception as e:
+                safe_print(f"Error reading {batch_file}: {e}")
+                continue
+        
+        if not analyses:
+            raise HTTPException(status_code=404, detail="No valid batch analysis data found")
+        
+        # Calculate averages
+        num_batches = len(analyses)
+        avg_positive = overall_positive / num_batches if num_batches > 0 else 0
+        avg_neutral = overall_neutral / num_batches if num_batches > 0 else 0
+        avg_negative = overall_negative / num_batches if num_batches > 0 else 0
+        
+        # Read processing status if available
+        processing_date = "Unknown"
+        try:
+            with open("llm_processing_status.json", 'r') as f:
+                status_data = json.load(f)
+                processing_date = status_data.get("processing_date", "Unknown")
+        except:
+            pass
+        
+        return JSONResponse(content={
+            'success': True,
+            'channelData': {
+                'channelName': channel_name,
+                'totalComments': total_comments,
+                'totalBatches': num_batches,
+                'overallPositive': round(avg_positive, 1),
+                'overallNeutral': round(avg_neutral, 1),
+                'overallNegative': round(avg_negative, 1),
+                'processingDate': processing_date
+            },
+            'batchAnalyses': analyses
+        })
+        
+    except Exception as e:
+        safe_print(f"Error getting batch analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading batch analysis: {str(e)}")
+
+def parse_batch_analysis(content: str, batch_number: int) -> dict:
+    """
+    Parse the content of a batch analysis file to extract structured data
+    """
+    try:
+        # Extract processing date
+        processing_date = ""
+        date_match = re.search(r'Processing Date: ([\d\-\s:]+)', content)
+        if date_match:
+            processing_date = date_match.group(1).strip()
+        
+        # Extract sentiment breakdown
+        positive_match = re.search(r'Positive comments: \((\d+\.?\d*)%\)', content)
+        neutral_match = re.search(r'Neutral comments: \((\d+\.?\d*)%\)', content)
+        negative_match = re.search(r'Negative comments: \((\d+\.?\d*)%\)', content)
+        
+        positive_pct = float(positive_match.group(1)) if positive_match else 0
+        neutral_pct = float(neutral_match.group(1)) if neutral_match else 0
+        negative_pct = float(negative_match.group(1)) if negative_match else 0
+        
+        # Extract total comments
+        comments_match = re.search(r'Total comments processed: (\d+)', content)
+        total_comments = int(comments_match.group(1)) if comments_match else 500  # Default assumption
+        
+        # Extract positive themes
+        positive_themes = []
+        positive_section = re.search(r'\*\*Common Positive Themes:\*\*(.*?)\*\*Common Negative Themes:\*\*', content, re.DOTALL)
+        if positive_section:
+            theme_matches = re.findall(r'\*\s+\*\*(.*?):\*\*(.*?)(?=\*\s+\*\*|\n\n|\*\*)', positive_section.group(1), re.DOTALL)
+            for title, description in theme_matches:
+                positive_themes.append(f"{title.strip()} - {description.strip()}")
+        
+        # Extract negative themes
+        negative_themes = []
+        negative_section = re.search(r'\*\*Common Negative Themes:\*\*(.*?)\*\*(?:Viewer Suggestions|What Viewers Appreciate):\*\*', content, re.DOTALL)
+        if negative_section:
+            theme_matches = re.findall(r'\*\s+\*\*(.*?):\*\*(.*?)(?=\*\s+\*\*|\n\n|\*\*)', negative_section.group(1), re.DOTALL)
+            for title, description in theme_matches:
+                negative_themes.append(f"{title.strip()} - {description.strip()}")
+        
+        # Extract viewer suggestions
+        suggestions = []
+        suggestions_section = re.search(r'\*\*Viewer Suggestions:\*\*(.*?)\*\*(?:What Viewers Appreciate|Content Recommendations):\*\*', content, re.DOTALL)
+        if suggestions_section:
+            suggestion_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', suggestions_section.group(1), re.DOTALL)
+            suggestions = [s.strip() for s in suggestion_matches if s.strip()]
+        
+        # Extract what viewers appreciate
+        appreciation = []
+        appreciation_section = re.search(r'\*\*What Viewers Appreciate:\*\*(.*?)\*\*Content Recommendations:\*\*', content, re.DOTALL)
+        if appreciation_section:
+            appreciation_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', appreciation_section.group(1), re.DOTALL)
+            appreciation = [a.strip() for a in appreciation_matches if a.strip()]
+        
+        # Extract content recommendations
+        recommendations = []
+        recommendations_section = re.search(r'\*\*Content Recommendations:\*\*(.*?)\*\*Top Positive Comments:\*\*', content, re.DOTALL)
+        if recommendations_section:
+            rec_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', recommendations_section.group(1), re.DOTALL)
+            recommendations = [r.strip() for r in rec_matches if r.strip()]
+        
+        # Extract top positive comments
+        top_positive = []
+        positive_comments_section = re.search(r'\*\*Top Positive Comments:\*\*(.*?)\*\*Top Negative Comments:\*\*', content, re.DOTALL)
+        if positive_comments_section:
+            comment_matches = re.findall(r'\*\s+"([^"]+)"', positive_comments_section.group(1))
+            top_positive = comment_matches[:5]  # Limit to top 5
+        
+        # Extract top negative comments
+        top_negative = []
+        negative_comments_section = re.search(r'\*\*Top Negative Comments:\*\*(.*?)(?:QUALITY CHECK|\Z)', content, re.DOTALL)
+        if negative_comments_section:
+            comment_matches = re.findall(r'\*\s+"([^"]+)"', negative_comments_section.group(1))
+            top_negative = comment_matches[:5]  # Limit to top 5
+        
+        return {
+            'batchNumber': batch_number,
+            'totalComments': total_comments,
+            'positivePercentage': positive_pct,
+            'neutralPercentage': neutral_pct,
+            'negativePercentage': negative_pct,
+            'positiveThemes': positive_themes,
+            'negativeThemes': negative_themes,
+            'suggestions': suggestions,
+            'appreciation': appreciation,
+            'recommendations': recommendations,
+            'topPositiveComments': top_positive,
+            'topNegativeComments': top_negative,
+            'processingDate': processing_date
+        }
+        
+    except Exception as e:
+        safe_print(f"Error parsing batch analysis: {e}")
+        return None

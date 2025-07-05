@@ -39,8 +39,23 @@ const Index = () => {
           <div className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-electric-blue after:transition-all after:duration-300 hover:after:w-full">Features</a>
             <a href="#how-it-works" className="text-gray-300 hover:text-electric-blue transition-all duration-300 relative after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-electric-blue after:transition-all after:duration-300 hover:after:w-full">How it Works</a>
-            <Button variant="outline" className="border-electric-blue text-electric-blue hover:bg-electric-blue hover:text-black transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-electric-blue/20">
-              Sign In
+            <Button 
+              onClick={() => navigate("/real-analytics")} 
+              variant="outline" 
+              size="sm"
+              className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Analytics
+            </Button>
+            <Button 
+              onClick={() => navigate("/dashboard")} 
+              variant="outline" 
+              size="sm"
+              className="border-electric-blue/30 text-electric-blue hover:bg-electric-blue/10"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Demo
             </Button>
           </div>
         </div>

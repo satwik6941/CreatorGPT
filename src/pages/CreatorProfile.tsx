@@ -10,7 +10,8 @@ import {
   ArrowRight, 
   Youtube, 
   Play,
-  ArrowLeft 
+  ArrowLeft,
+  BarChart3
 } from "lucide-react";
 
 const CreatorProfile = () => {
@@ -21,6 +22,7 @@ const CreatorProfile = () => {
     e.preventDefault();
     if (channelId.trim()) {
       console.log("Channel ID:", channelId);
+      // Navigate directly to the analysis page with the channel ID
       navigate(`/analysis-realtime?channelId=${encodeURIComponent(channelId)}`);
     }
   };
@@ -36,14 +38,25 @@ const CreatorProfile = () => {
             </div>
             <span className="text-xl font-bold transition-colors duration-300 group-hover:text-electric-blue">Creator GPT</span>
           </div>
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate("/")}
-            className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 group"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
-            Back to Home
-          </Button>
+          <div className="flex items-center space-x-4">
+            <Button 
+              onClick={() => navigate("/dashboard")} 
+              variant="outline" 
+              size="sm"
+              className="border-electric-blue/30 text-electric-blue hover:bg-electric-blue/10"
+            >
+              <BarChart3 className="w-4 h-4 mr-1" />
+              Dashboard
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate("/")}
+              className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-105 group"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
+              Back to Home
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -86,7 +99,7 @@ const CreatorProfile = () => {
                 </div>
 
                 {/* Submit Button */}
-                <div className="pt-6 animate-fade-in opacity-0" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
+                <div className="pt-6 space-y-3 animate-fade-in opacity-0" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
                   <Button
                     type="submit"
                     size="lg"
@@ -96,6 +109,17 @@ const CreatorProfile = () => {
                     <Play className="w-5 h-5 mr-2 group-hover:animate-spin transition-transform duration-300" />
                     Start Analyzing My Comments
                     <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-all duration-300 hover:scale-105"
+                    onClick={() => navigate('/real-analytics')}
+                  >
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    View Existing Analytics
                   </Button>
                 </div>
               </form>

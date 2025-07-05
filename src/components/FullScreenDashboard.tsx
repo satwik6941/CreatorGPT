@@ -31,8 +31,11 @@ import {
   RefreshCw,
   Youtube,
   Clock,
-  TrendingDown
+  TrendingDown,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
+import { apiService } from '@/services/api';
 
 interface SentimentData {
   sentiment: string;
@@ -47,6 +50,39 @@ interface EngagementData {
   views: number;
 }
 
+interface VideoPerformance {
+  title: string;
+  views: number;
+  likes: number;
+  comments: number;
+  engagement_rate: number;
+}
+
+interface AudienceDemographics {
+  age_group: string;
+  percentage: number;
+  count: number;
+}
+
+interface WatchTimeData {
+  day: string;
+  hours: number;
+}
+
+interface ContentCategory {
+  category: string;
+  count: number;
+  avg_views: number;
+  engagement: number;
+}
+
+interface SentimentTrend {
+  month: string;
+  positive: number;
+  neutral: number;
+  negative: number;
+}
+
 interface ChannelStats {
   channel_name: string;
   subscriber_count: string;
@@ -57,6 +93,11 @@ interface ChannelStats {
   avg_sentiment_score: number;
   sentiment_distribution: SentimentData[];
   engagement_over_time: EngagementData[];
+  video_performance: VideoPerformance[];
+  audience_demographics: AudienceDemographics[];
+  watch_time_by_day: WatchTimeData[];
+  content_categories: ContentCategory[];
+  sentiment_trends: SentimentTrend[];
   top_keywords: Array<{ keyword: string; count: number }>;
   comment_trends: Array<{ hour: number; count: number }>;
   monthly_growth: Array<{ month: string; subscribers: number; views: number }>;
@@ -71,11 +112,18 @@ const COLORS = {
   negative: '#FF3B30',  // bright-red  
   neutral: '#00D4FF',   // electric-blue
   primary: '#00D4FF',   // electric-blue
-  secondary: '#8B5CF6', 
-  accent: '#F59E0B',
-  success: '#22C55E',
-  warning: '#F59E0B',
-  info: '#00D4FF',
+  secondary: '#8B5CF6', // purple
+  tertiary: '#F59E0B',  // orange
+  accent: '#F59E0B',    // orange
+  success: '#22C55E',   // green
+  warning: '#F59E0B',   // orange
+  info: '#00D4FF',      // electric-blue
+  pink: '#EC4899',      // pink
+  purple: '#8B5CF6',    // purple
+  indigo: '#6366F1',    // indigo
+  cyan: '#06B6D4',      // cyan
+  teal: '#14B8A6',      // teal
+  lime: '#84CC16',      // lime
   background: '#000000', // deep-black
   cardBg: '#1A1A1A',    // dark-surface
   textPrimary: '#FFFFFF',
@@ -83,10 +131,44 @@ const COLORS = {
   border: 'rgba(255, 255, 255, 0.08)',
   glass: 'rgba(255, 255, 255, 0.03)',
   chart: {
-    grid: 'rgba(255, 255, 255, 0.1)',
-    text: '#B0B0B0',
-    axis: 'rgba(255, 255, 255, 0.2)'
+    grid: 'rgba(255, 255, 255, 0.15)',  // More visible grid
+    text: '#E5E5E5',                    // Brighter text
+    axis: 'rgba(255, 255, 255, 0.3)'    // More visible axis
   }
+};
+
+// Helper function to extract keywords from batch analysis data
+const extractKeywords = (batchAnalyses: any[]): Array<{ keyword: string; count: number }> => {
+  const keywordMap = new Map<string, number>();
+  
+  batchAnalyses.forEach(batch => {
+    // Extract keywords from positive and negative themes
+    [...(batch.positiveThemes || []), ...(batch.negativeThemes || [])].forEach(theme => {
+      const words = theme.toLowerCase().split(/\s+/);
+      words.forEach(word => {
+        // Filter out common words and keep meaningful keywords
+        if (word.length > 3 && !['this', 'that', 'with', 'from', 'they', 'have', 'been', 'will', 'were', 'your', 'their', 'would', 'could', 'should'].includes(word)) {
+          keywordMap.set(word, (keywordMap.get(word) || 0) + 1);
+        }
+      });
+    });
+    
+    // Extract keywords from comments
+    [...(batch.topPositiveComments || []), ...(batch.topNegativeComments || [])].forEach(comment => {
+      const words = comment.toLowerCase().split(/\s+/);
+      words.forEach(word => {
+        if (word.length > 3 && !['this', 'that', 'with', 'from', 'they', 'have', 'been', 'will', 'were', 'your', 'their', 'would', 'could', 'should'].includes(word)) {
+          keywordMap.set(word, (keywordMap.get(word) || 0) + 1);
+        }
+      });
+    });
+  });
+  
+  // Convert to array and sort by count
+  return Array.from(keywordMap.entries())
+    .map(([keyword, count]) => ({ keyword, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10); // Return top 10 keywords
 };
 
 const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis }) => {
@@ -99,72 +181,89 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
     setError(null);
     
     try {
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? '/api/dashboard-data' 
-        : 'http://localhost:8000/api/dashboard-data';
-        
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
+      console.log('Fetching real batch analysis data...');
+      const response = await apiService.getBatchAnalysis();
       
-      const data = await response.json();
-      setDashboardData(data);
+      if (response.success && response.channelData && response.batchAnalyses) {
+        const { channelData, batchAnalyses } = response;
+        
+        // Transform real data to match dashboard format
+        const transformedData: ChannelStats = {
+          channel_name: channelData.channelName,
+          subscriber_count: 'N/A', // Not available in batch analysis
+          total_videos: 0, // Not available in batch analysis
+          total_comments: channelData.totalComments,
+          total_views: 0, // Not available in batch analysis
+          channel_created: channelData.processingDate,
+          avg_sentiment_score: channelData.overallPositive / 100,
+          sentiment_distribution: [
+            { sentiment: 'Positive', count: Math.round(channelData.totalComments * channelData.overallPositive / 100), percentage: channelData.overallPositive },
+            { sentiment: 'Neutral', count: Math.round(channelData.totalComments * channelData.overallNeutral / 100), percentage: channelData.overallNeutral },
+            { sentiment: 'Negative', count: Math.round(channelData.totalComments * channelData.overallNegative / 100), percentage: channelData.overallNegative }
+          ],
+          // Create engagement data from batch analysis
+          engagement_over_time: batchAnalyses.map((batch: any, index: number) => ({
+            date: `Batch ${batch.batchNumber}`,
+            likes: 0, // Not available
+            comments: batch.totalComments,
+            views: 0 // Not available
+          })),
+          // Transform batch data for video performance (using batches as proxy)
+          video_performance: batchAnalyses.slice(0, 5).map((batch: any) => ({
+            title: `Analysis Batch ${batch.batchNumber}`,
+            views: 0, // Not available
+            likes: 0, // Not available
+            comments: batch.totalComments,
+            engagement_rate: batch.positivePercentage
+          })),
+          // Default demographics (not available in batch analysis)
+          audience_demographics: [
+            { age_group: 'Data not available', percentage: 100, count: channelData.totalComments }
+          ],
+          // Default watch time (not available)
+          watch_time_by_day: [
+            { day: 'No data available', hours: 0 }
+          ],
+          // Transform themes into content categories
+          content_categories: batchAnalyses.slice(0, 5).map((batch: any) => ({
+            category: `Batch ${batch.batchNumber} Analysis`,
+            count: 1,
+            avg_views: 0,
+            engagement: batch.positivePercentage
+          })),
+          // Create sentiment trends from batch data
+          sentiment_trends: batchAnalyses.slice(0, 6).map((batch: any, index: number) => ({
+            month: `Batch ${batch.batchNumber}`,
+            positive: batch.positivePercentage,
+            neutral: batch.neutralPercentage,
+            negative: batch.negativePercentage
+          })),
+          // Extract keywords from themes and comments
+          top_keywords: extractKeywords(batchAnalyses),
+          // Default comment trends (not available in batch data)
+          comment_trends: Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            count: Math.round(channelData.totalComments / 24)
+          })),
+          // Default monthly growth (not available)
+          monthly_growth: [
+            { month: 'Analysis Date', subscribers: 0, views: 0 }
+          ]
+        };
+        
+        setDashboardData(transformedData);
+        console.log('Dashboard data loaded successfully:', transformedData);
+      } else {
+        throw new Error('No batch analysis data found');
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data');
+      setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
       
-      // Mock data for development/testing with enhanced analytics
-      setDashboardData({
-        channel_name: 'Sample Creator Channel',
-        subscriber_count: '125,423',
-        total_videos: 87,
-        total_comments: 4250,
-        total_views: 2847632,
-        channel_created: '2021-03-15',
-        avg_sentiment_score: 0.72,
-        sentiment_distribution: [
-          { sentiment: 'Positive', count: 2785, percentage: 65.5 },
-          { sentiment: 'Neutral', count: 935, percentage: 22.0 },
-          { sentiment: 'Negative', count: 530, percentage: 12.5 }
-        ],
-        engagement_over_time: [
-          { date: '2024-01', likes: 15600, comments: 420, views: 185600 },
-          { date: '2024-02', likes: 18200, comments: 510, views: 224800 },
-          { date: '2024-03', likes: 21400, comments: 625, views: 267200 },
-          { date: '2024-04', likes: 24800, comments: 742, views: 312400 },
-          { date: '2024-05', likes: 28300, comments: 856, views: 365800 },
-          { date: '2024-06', likes: 32100, comments: 945, views: 425600 }
-        ],
-        top_keywords: [
-          { keyword: 'amazing', count: 342 },
-          { keyword: 'helpful', count: 287 },
-          { keyword: 'great', count: 265 },
-          { keyword: 'awesome', count: 234 },
-          { keyword: 'love', count: 198 },
-          { keyword: 'fantastic', count: 176 },
-          { keyword: 'excellent', count: 154 },
-          { keyword: 'perfect', count: 132 }
-        ],
-        comment_trends: [
-          { hour: 0, count: 45 }, { hour: 1, count: 28 }, { hour: 2, count: 18 },
-          { hour: 3, count: 12 }, { hour: 4, count: 15 }, { hour: 5, count: 25 },
-          { hour: 6, count: 58 }, { hour: 7, count: 89 }, { hour: 8, count: 134 },
-          { hour: 9, count: 167 }, { hour: 10, count: 201 }, { hour: 11, count: 245 },
-          { hour: 12, count: 289 }, { hour: 13, count: 312 }, { hour: 14, count: 334 },
-          { hour: 15, count: 378 }, { hour: 16, count: 425 }, { hour: 17, count: 467 },
-          { hour: 18, count: 523 }, { hour: 19, count: 589 }, { hour: 20, count: 612 },
-          { hour: 21, count: 545 }, { hour: 22, count: 434 }, { hour: 23, count: 267 }
-        ],
-        monthly_growth: [
-          { month: 'Jan 2024', subscribers: 98420, views: 1456000 },
-          { month: 'Feb 2024', subscribers: 105680, views: 1687000 },
-          { month: 'Mar 2024', subscribers: 112450, views: 1892000 },
-          { month: 'Apr 2024', subscribers: 118920, views: 2134000 },
-          { month: 'May 2024', subscribers: 122340, views: 2387000 },
-          { month: 'Jun 2024', subscribers: 125423, views: 2847632 }
-        ]
-      });
+      // Fallback: try to show what we can with minimal data
+      if (error instanceof Error && error.message.includes('No batch analysis data found')) {
+        setError('No analysis data available. Please run an analysis first.');
+      }
     } finally {
       setLoading(false);
     }
@@ -225,392 +324,210 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
               </div>
             </div>
             <Button onClick={onNewAnalysis} className="bg-electric-blue hover:bg-electric-blue/90 text-black font-semibold glow-button">
-              <BarChart3 className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4 mr-2" />
               New Analysis
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Main Dashboard Content */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Channel Overview Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
-            <Users className="h-6 w-6 mr-2 text-electric-blue" />
-            Channel Overview
-          </h2>
-          
-          {/* Channel Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="glass-card border-l-4 border-l-electric-blue">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Channel Name</CardTitle>
-                <Youtube className="h-4 w-4 text-electric-blue" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{dashboardData?.channel_name}</div>
-                <p className="text-xs text-gray-500 mt-1">Active since {dashboardData?.channel_created}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-l-4 border-l-neon-green">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Subscribers</CardTitle>
-                <Users className="h-4 w-4 text-neon-green" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{dashboardData?.subscriber_count}</div>
-                <p className="text-xs text-neon-green flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  Growing audience
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-l-4 border-l-purple-400">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Total Videos</CardTitle>
-                <Eye className="h-4 w-4 text-purple-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{dashboardData?.total_videos}</div>
-                <p className="text-xs text-gray-500 mt-1">Content library</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-l-4 border-l-orange-400">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Total Views</CardTitle>
-                <TrendingUp className="h-4 w-4 text-orange-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  {dashboardData?.total_views?.toLocaleString() || '0'}
-                </div>
-                <p className="text-xs text-orange-400 flex items-center mt-1">
-                  <Eye className="h-3 w-3 mr-1" />
-                  Lifetime views
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Engagement Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <Card className="glass-card border-l-4 border-l-bright-red">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Total Comments</CardTitle>
-                <MessageSquare className="h-4 w-4 text-bright-red" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white">{dashboardData?.total_comments.toLocaleString()}</div>
-                <p className="text-xs text-gray-500 mt-1">Comments analyzed</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-l-4 border-l-pink-400">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">Overall Sentiment</CardTitle>
-                <Heart className="h-4 w-4 text-pink-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white">
-                  {((dashboardData?.avg_sentiment_score || 0) * 100).toFixed(1)}%
-                </div>
-                <p className="text-xs text-pink-400 flex items-center mt-1">
-                  <ThumbsUp className="h-3 w-3 mr-1" />
-                  {(dashboardData?.avg_sentiment_score || 0) > 0.6 ? 'Positive Community' : 'Mixed Sentiment'}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Analytics Charts Section */}
-        <div className="space-y-8">
-          <h2 className="text-2xl font-bold text-white flex items-center">
-            <BarChart3 className="h-6 w-6 mr-2 text-electric-blue" />
-            Analytics & Insights
-          </h2>
-
-          {/* Sentiment Analysis Chart */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2 text-white">
-                <Heart className="h-5 w-5 text-pink-400" />
-                Sentiment Distribution
-              </CardTitle>
-              <p className="text-gray-400">Analysis of comment sentiment across your content</p>
+        {/* Channel Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="glass-card border-electric-blue/20 hover:border-electric-blue/40 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Total Comments</CardTitle>
+              <MessageSquare className="h-4 w-4 text-electric-blue" />
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Pie Chart */}
-                <div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={dashboardData?.sentiment_distribution}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="count"
-                        label={({ sentiment, percentage }) => `${sentiment}: ${percentage}%`}
-                      >
-                        {dashboardData?.sentiment_distribution.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={
-                              entry.sentiment === 'Positive' ? COLORS.positive :
-                              entry.sentiment === 'Negative' ? COLORS.negative :
-                              COLORS.neutral
-                            } 
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: number) => [value.toLocaleString(), 'Comments']}
-                        contentStyle={{
-                          backgroundColor: 'rgba(26, 26, 26, 0.95)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '8px',
-                          color: '#ffffff'
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                {/* Summary Stats */}
-                <div className="flex flex-col justify-center space-y-4">
-                  {dashboardData?.sentiment_distribution.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg glass-effect">
-                      <div className="flex items-center space-x-3">
-                        <div 
-                          className="w-4 h-4 rounded-full"
-                          style={{
-                            backgroundColor: item.sentiment === 'Positive' ? COLORS.positive :
-                                           item.sentiment === 'Negative' ? COLORS.negative :
-                                           COLORS.neutral
-                          }}
-                        />
-                        <span className="font-medium text-white">{item.sentiment}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-white">{item.count.toLocaleString()}</div>
-                        <div className="text-sm text-gray-400">{item.percentage}%</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div className="text-2xl font-bold text-white">{dashboardData?.total_comments?.toLocaleString() || '0'}</div>
+              <p className="text-xs text-gray-500 mt-1">Analyzed by AI</p>
             </CardContent>
           </Card>
 
-          {/* Engagement Over Time Chart */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2 text-white">
-                <TrendingUp className="h-5 w-5 text-electric-blue" />
-                Engagement Trends Over Time
-              </CardTitle>
-              <p className="text-gray-400">Monthly performance across key metrics</p>
+          <Card className="glass-card border-neon-green/20 hover:border-neon-green/40 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Positive Sentiment</CardTitle>
+              <ThumbsUp className="h-4 w-4 text-neon-green" />
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <AreaChart data={dashboardData?.engagement_over_time}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
-                  <XAxis dataKey="date" tick={{ fill: COLORS.chart.text }} />
-                  <YAxis tick={{ fill: COLORS.chart.text }} />
+              <div className="text-2xl font-bold text-neon-green">
+                {dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Positive')?.percentage?.toFixed(1) || '0'}%
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Overall positivity</p>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-bright-red/20 hover:border-bright-red/40 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Negative Sentiment</CardTitle>
+              <TrendingDown className="h-4 w-4 text-bright-red" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-bright-red">
+                {dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Negative')?.percentage?.toFixed(1) || '0'}%
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Areas to improve</p>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-orange/20 hover:border-orange/40 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Analysis Date</CardTitle>
+              <Calendar className="h-4 w-4 text-orange" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange">
+                {dashboardData?.channel_created || 'N/A'}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Last processed</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sentiment Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-electric-blue" />
+                Sentiment Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={dashboardData?.sentiment_distribution || []}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percentage }) => `${name} (${percentage.toFixed(1)}%)`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                  >
+                    {dashboardData?.sentiment_distribution?.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={
+                        entry.sentiment === 'Positive' ? COLORS.positive :
+                        entry.sentiment === 'Negative' ? COLORS.negative :
+                        COLORS.neutral
+                      } />
+                    ))}
+                  </Pie>
                   <Tooltip 
-                    formatter={(value: number) => [value.toLocaleString()]}
-                    contentStyle={{
-                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '8px',
-                      color: '#ffffff'
+                      color: '#fff'
                     }}
                   />
-                  <Legend 
-                    wrapperStyle={{ color: COLORS.chart.text }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="views" 
-                    stackId="1" 
-                    stroke={COLORS.primary} 
-                    fill={COLORS.primary}
-                    fillOpacity={0.7}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="likes" 
-                    stackId="2" 
-                    stroke={COLORS.positive} 
-                    fill={COLORS.positive}
-                    fillOpacity={0.7}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="comments" 
-                    stackId="3" 
-                    stroke={COLORS.accent} 
-                    fill={COLORS.accent}
-                    fillOpacity={0.7}
-                  />
-                </AreaChart>
+                </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Top Keywords Chart */}
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2 text-white">
-                <MessageSquare className="h-5 w-5 text-neon-green" />
-                Most Popular Keywords
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-neon-green" />
+                Comments by Batch
               </CardTitle>
-              <p className="text-gray-400">Words most frequently used in comments</p>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart 
-                  data={dashboardData?.top_keywords} 
-                  layout="horizontal"
-                  margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
-                >
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dashboardData?.engagement_over_time || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
-                  <XAxis type="number" tick={{ fill: COLORS.chart.text }} />
-                  <YAxis dataKey="keyword" type="category" width={80} tick={{ fill: COLORS.chart.text }} />
+                  <XAxis dataKey="date" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
                   <Tooltip 
-                    formatter={(value: number) => [value, 'Mentions']}
-                    contentStyle={{
-                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '8px',
-                      color: '#ffffff'
+                      color: '#fff'
                     }}
                   />
-                  <Bar 
-                    dataKey="count" 
-                    fill={COLORS.secondary}
-                    radius={[0, 4, 4, 0]}
-                  />
+                  <Bar dataKey="comments" fill={COLORS.primary} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
-          {/* Comment Activity by Hour */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2 text-white">
-                <Clock className="h-5 w-5 text-orange-400" />
-                Daily Activity Patterns
-              </CardTitle>
-              <p className="text-gray-400">When your audience is most active throughout the day</p>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={dashboardData?.comment_trends}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
-                  <XAxis 
-                    dataKey="hour" 
-                    tickFormatter={(hour) => `${hour}:00`}
-                    tick={{ fill: COLORS.chart.text }}
-                  />
-                  <YAxis tick={{ fill: COLORS.chart.text }} />
-                  <Tooltip 
-                    labelFormatter={(hour) => `${hour}:00`}
-                    formatter={(value: number) => [value, 'Comments']}
-                    contentStyle={{
-                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      color: '#ffffff'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke={COLORS.primary}
-                    strokeWidth={3}
-                    dot={{ fill: COLORS.primary, strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: COLORS.primary, strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Growth Chart */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2 text-white">
-                <TrendingUp className="h-5 w-5 text-purple-400" />
-                Channel Growth Over Time
-              </CardTitle>
-              <p className="text-gray-400">Subscriber and view growth progression</p>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={dashboardData?.monthly_growth}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
-                  <XAxis dataKey="month" tick={{ fill: COLORS.chart.text }} />
-                  <YAxis yAxisId="left" tick={{ fill: COLORS.chart.text }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fill: COLORS.chart.text }} />
-                  <Tooltip 
-                    formatter={(value: number) => [value.toLocaleString()]}
-                    contentStyle={{
-                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      color: '#ffffff'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ color: COLORS.chart.text }} />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="subscribers" 
-                    stroke={COLORS.secondary}
-                    strokeWidth={3}
-                    dot={{ fill: COLORS.secondary, r: 5 }}
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="views" 
-                    stroke={COLORS.primary}
-                    strokeWidth={3}
-                    dot={{ fill: COLORS.primary, r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </div>
-        
-        {/* Summary Footer */}
-        <Card className="mt-8 glass-effect border border-electric-blue/30">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <h3 className="text-2xl font-bold text-white mb-4">Analysis Complete!</h3>
-              <p className="text-gray-400 mb-6">
-                Your channel shows strong engagement with a positive community sentiment. 
-                Keep creating great content to maintain this momentum!
-              </p>
-              <Button 
-                onClick={onNewAnalysis}
-                size="lg"
-                className="bg-gradient-to-r from-electric-blue to-bright-red hover:from-electric-blue/90 hover:to-bright-red/90 text-black font-semibold glow-button"
-              >
-                <BarChart3 className="h-5 w-5 mr-2" />
-                Analyze Another Channel
-              </Button>
+
+        {/* Top Keywords */}
+        <Card className="glass-card mb-8">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-white flex items-center">
+              <MessageSquare className="h-5 w-5 mr-2 text-electric-blue" />
+              Top Keywords from Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {dashboardData?.top_keywords?.map((keyword, index) => (
+                <Badge 
+                  key={index} 
+                  variant="outline" 
+                  className="border-electric-blue/30 text-electric-blue bg-electric-blue/10 hover:bg-electric-blue/20"
+                >
+                  {keyword.keyword} ({keyword.count})
+                </Badge>
+              ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Sentiment Trends */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-white flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-neon-green" />
+              Sentiment Trends Across Batches
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={400}>
+              <AreaChart data={dashboardData?.sentiment_trends || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                <YAxis stroke={COLORS.chart.text} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1A1A1A', 
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="positive" 
+                  stackId="1" 
+                  stroke={COLORS.positive}
+                  fill={COLORS.positive}
+                  fillOpacity={0.6}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="neutral" 
+                  stackId="1" 
+                  stroke={COLORS.neutral}
+                  fill={COLORS.neutral}
+                  fillOpacity={0.6}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="negative" 
+                  stackId="1" 
+                  stroke={COLORS.negative}
+                  fill={COLORS.negative}
+                  fillOpacity={0.6}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
