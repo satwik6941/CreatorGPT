@@ -50,6 +50,17 @@ export const apiService = {
     }
   },
 
+  // Get comprehensive analysis (YouTube analytics + batch analysis)
+  async getComprehensiveAnalysis() {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/comprehensive-analysis`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get comprehensive analysis:', error);
+      throw error;
+    }
+  },
+
   // WebSocket connection for real-time updates
   createWebSocket(onMessage: (data: WebSocketMessage) => void, onError?: (error: Event) => void) {
     const ws = new WebSocket(`ws://localhost:8000/ws/analysis`);

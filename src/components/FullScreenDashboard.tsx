@@ -103,6 +103,39 @@ interface ChannelStats {
   monthly_growth: Array<{ month: string; subscribers: number; views: number }>;
 }
 
+interface ComprehensiveAnalysis {
+  channel_overview: {
+    channel_name: string;
+    subscriber_count: string;
+    establishment_date: string;
+    total_videos: number;
+    total_views: number;
+  };
+  sentiment_scores: {
+    positive_percentage: number;
+    neutral_percentage: number;
+    negative_percentage: number;
+  };
+  monthly_data: {
+    subscribers: Array<{ month: string; count: number }>;
+    views: Array<{ month: string; average_views: number }>;
+  };
+  new_graphs: {
+    monthly_views: Array<{ month: string; views: number }>;
+    monthly_subscribers: Array<{ month: string; subscribers: number }>;
+    monthly_likes: Array<{ month: string; likes: number }>;
+    views_vs_likes: Array<{ month: string; views: number; likes: number }>;
+    views_vs_subscribers: Array<{ month: string; views: number; subscribers: number }>;
+    subscribers_vs_likes: Array<{ month: string; subscribers: number; likes: number }>;
+  };
+  all_positive_comments: Array<{ text: string; sentiment: string; score: number }>;
+  all_negative_comments: Array<{ text: string; sentiment: string; score: number }>;
+  viewer_suggestions: string[];
+  content_recommendations: string[];
+  total_comments: number;
+  processing_date: string;
+}
+
 interface FullScreenDashboardProps {
   onNewAnalysis: () => void;
 }
@@ -173,6 +206,7 @@ const extractKeywords = (batchAnalyses: any[]): Array<{ keyword: string; count: 
 
 const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis }) => {
   const [dashboardData, setDashboardData] = useState<ChannelStats | null>(null);
+  const [analysisData, setAnalysisData] = useState<ComprehensiveAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -269,8 +303,25 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
     }
   };
 
+  const fetchComprehensiveAnalysis = async () => {
+    try {
+      console.log('Fetching comprehensive analysis data...');
+      const response = await apiService.getComprehensiveAnalysis();
+      
+      if (response.success && response.data) {
+        setAnalysisData(response.data);
+        console.log('Comprehensive analysis data loaded:', response.data);
+      } else {
+        console.error('Failed to load comprehensive analysis:', response);
+      }
+    } catch (error) {
+      console.error('Error fetching comprehensive analysis:', error);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchComprehensiveAnalysis();
   }, []);
 
   if (loading) {
@@ -479,6 +530,87 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
             </div>
           </CardContent>
         </Card>
+
+        {/* All Comments Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* All Positive Comments */}
+          <Card className="glass-card border-neon-green/20 hover:border-neon-green/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-neon-green flex items-center">
+                <ThumbsUp className="h-5 w-5 mr-2" />
+                All Positive Comments
+                <Badge variant="secondary" className="ml-2 bg-neon-green/20 text-neon-green border-neon-green/30">
+                  {analysisData?.all_positive_comments?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="custom-scrollbar max-h-96 overflow-y-auto space-y-3">
+                {analysisData?.all_positive_comments?.length ? (
+                  analysisData.all_positive_comments.map((comment, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="outline" className="text-neon-green border-neon-green/30 bg-neon-green/10">
+                          {comment.sentiment}
+                        </Badge>
+                        <span className="text-sm text-neon-green font-medium">
+                          Score: {comment.score}/100
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {comment.text}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No positive comments available</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* All Negative Comments */}
+          <Card className="glass-card border-bright-red/20 hover:border-bright-red/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-bright-red flex items-center">
+                <TrendingDown className="h-5 w-5 mr-2" />
+                All Negative Comments
+                <Badge variant="secondary" className="ml-2 bg-bright-red/20 text-bright-red border-bright-red/30">
+                  {analysisData?.all_negative_comments?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="custom-scrollbar max-h-96 overflow-y-auto space-y-3">
+                {analysisData?.all_negative_comments?.length ? (
+                  analysisData.all_negative_comments.map((comment, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-bright-red/10 border border-bright-red/20">
+                      <div className="flex justify-between items-start mb-2">
+                        <Badge variant="outline" className="text-bright-red border-bright-red/30 bg-bright-red/10">
+                          {comment.sentiment}
+                        </Badge>
+                        <span className="text-sm text-bright-red font-medium">
+                          Score: {comment.score}/100
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300 leading-relaxed">
+                        {comment.text}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No negative comments available</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Sentiment Trends */}
         <Card className="glass-card">
