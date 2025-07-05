@@ -54,15 +54,30 @@ class ConnectionManager:
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         try:
-            await websocket.send_text(message)
-        except:
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.send_text(message)
+            else:
+                print(f"[WARNING] WebSocket not connected, removing from active connections")
+                self.disconnect(websocket)
+        except Exception as e:
+            print(f"[WARNING] Error sending WebSocket message: {e}")
             self.disconnect(websocket)
 
     async def broadcast(self, message: str):
-        for connection in self.active_connections.copy():
+        if not self.active_connections:
+            return
+        
+        # Create a copy of the list to avoid modification during iteration
+        connections_to_check = self.active_connections.copy()
+        
+        for connection in connections_to_check:
             try:
-                await connection.send_text(message)
-            except:
+                if connection.client_state.name == "CONNECTED":
+                    await connection.send_text(message)
+                else:
+                    self.disconnect(connection)
+            except Exception as e:
+                print(f"[WARNING] Error broadcasting to WebSocket: {e}")
                 self.disconnect(connection)
 
 # Initialize connection manager
@@ -199,6 +214,10 @@ analysis_state = {
 async def broadcast_analysis_update():
     """Broadcast current analysis state to all connected WebSocket clients"""
     try:
+        # Check if there are any active connections
+        if not manager.active_connections:
+            return
+        
         # Ensure the analysis_state is JSON serializable
         serializable_state = dict(analysis_state)
         
@@ -221,24 +240,37 @@ async def broadcast_analysis_update():
 # WebSocket endpoint for real-time analysis updates
 @app.websocket("/ws/analysis")
 async def websocket_analysis(websocket: WebSocket):
-    await manager.connect(websocket)
+    """WebSocket endpoint for real-time analysis updates"""
     try:
+        await manager.connect(websocket)
+        safe_print(f"[DEBUG] New WebSocket connection established. Total connections: {len(manager.active_connections)}")
+        
         # Send current state immediately on connect
         await manager.send_personal_message(json.dumps(analysis_state), websocket)
         
+        # Keep connection alive and handle any client messages
         while True:
-            # Keep connection alive and handle any client messages
             try:
+                # Wait for any message with a timeout to keep connection alive
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
                 # Echo back or handle client messages if needed
+                safe_print(f"[DEBUG] Received WebSocket message: {data}")
             except asyncio.TimeoutError:
                 # Send ping to keep connection alive
-                await manager.send_personal_message(json.dumps({"type": "ping"}), websocket)
+                await manager.send_personal_message(json.dumps({"type": "ping", "timestamp": time.time()}), websocket)
+            except WebSocketDisconnect:
+                safe_print("[DEBUG] WebSocket disconnected by client")
+                break
+            
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        safe_print("[DEBUG] WebSocket disconnected")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        safe_print(f"[ERROR] WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
         manager.disconnect(websocket)
+        safe_print(f"[DEBUG] WebSocket connection closed. Remaining connections: {len(manager.active_connections)}")
 
 def update_analysis_state(updates: dict):
     """Update analysis state and broadcast to WebSocket clients"""
@@ -248,9 +280,10 @@ def update_analysis_state(updates: dict):
     # Print debug info
     safe_print(f"[DEBUG] Analysis state updated: {updates}")
     
-    # Try to broadcast using asyncio if possible
+    # Use a thread-safe approach to broadcast updates
     try:
         import asyncio
+        import threading
         
         # Check if there's a running event loop
         try:
@@ -258,19 +291,25 @@ def update_analysis_state(updates: dict):
             # Create task to broadcast in the background
             asyncio.create_task(broadcast_analysis_update())
         except RuntimeError:
-            # No running loop, try to run the broadcast synchronously
+            # No running loop, try to handle it safely
             try:
-                asyncio.run(broadcast_analysis_update())
+                # Only try to run if we have active connections
+                if manager.active_connections:
+                    def run_broadcast():
+                        try:
+                            asyncio.run(broadcast_analysis_update())
+                        except Exception as e:
+                            print(f"[WARNING] Broadcast failed: {e}")
+                    
+                    # Run in a separate thread to avoid blocking
+                    thread = threading.Thread(target=run_broadcast)
+                    thread.daemon = True
+                    thread.start()
+                else:
+                    # No active connections, skip broadcasting
+                    pass
             except Exception as e:
-                print(f"[WARNING] Could not run async broadcast: {e}")
-                # Schedule it for later if possible
-                try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(broadcast_analysis_update())
-                    loop.close()
-                except Exception as e2:
-                    print(f"[WARNING] All broadcast attempts failed: {e2}")
+                print(f"[WARNING] Could not schedule broadcast: {e}")
     except Exception as e:
         print(f"[WARNING] Could not broadcast update: {e}")
         # Continue without broadcasting
@@ -950,25 +989,7 @@ async def get_analysis_logs():
         "error": analysis_state.get("error")
     }
 
-@app.websocket("/ws/analysis")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time analysis updates"""
-    await manager.connect(websocket)
-    try:
-        # Send current state immediately upon connection
-        await manager.send_personal_message(json.dumps(analysis_state), websocket)
-        
-        # Keep connection alive and wait for disconnection
-        while True:
-            # Wait for any message (ping/pong to keep connection alive)
-            try:
-                await websocket.receive_text()
-            except WebSocketDisconnect:
-                break
-    except WebSocketDisconnect:
-        pass
-    finally:
-        manager.disconnect(websocket)
+
 
 @app.post("/api/reset")
 async def reset_analysis():
@@ -1156,23 +1177,32 @@ async def get_available_files():
     
     return files
 
-@app.post("/api/test-websocket")
+@app.get("/api/test-websocket")
 async def test_websocket():
-    """Test WebSocket broadcasting"""
+    """Test endpoint to verify WebSocket broadcasting"""
     test_message = {
         "status": "test",
-        "step": "websocket_test",
-        "message": "WebSocket test message",
+        "step": "Testing WebSocket",
+        "message": "This is a test message for WebSocket functionality",
         "progress": 50,
-        "logs": [f"Test message sent at {datetime.now().isoformat()}"]
+        "timestamp": time.time()
     }
     
+    # Update the analysis state which should trigger WebSocket broadcast
     update_analysis_state(test_message)
     
     return {
-        "message": "Test message sent",
+        "message": "Test WebSocket message sent",
         "active_connections": len(manager.active_connections),
         "test_data": test_message
+    }
+
+@app.get("/api/websocket-status")
+async def websocket_status():
+    """Get current WebSocket connection status"""
+    return {
+        "active_connections": len(manager.active_connections),
+        "analysis_state": analysis_state
     }
 
 @app.get("/api/dashboard-data")
@@ -1656,86 +1686,378 @@ def parse_batch_analysis(content: str, batch_number: int) -> dict:
         if date_match:
             processing_date = date_match.group(1).strip()
         
-        # Extract sentiment breakdown
-        positive_match = re.search(r'Positive comments: \((\d+\.?\d*)%\)', content)
-        neutral_match = re.search(r'Neutral comments: \((\d+\.?\d*)%\)', content)
-        negative_match = re.search(r'Negative comments: \((\d+\.?\d*)%\)', content)
+        # Extract sentiment breakdown - updated regex patterns to match actual file format
+        positive_match = re.search(r'Positive comments?: .*?\((\d+\.?\d*)%\)', content)
+        neutral_match = re.search(r'Neutral comments?: .*?\((\d+\.?\d*)%\)', content)
+        negative_match = re.search(r'Negative comments?: .*?\((\d+\.?\d*)%\)', content)
         
         positive_pct = float(positive_match.group(1)) if positive_match else 0
         neutral_pct = float(neutral_match.group(1)) if neutral_match else 0
         negative_pct = float(negative_match.group(1)) if negative_match else 0
         
-        # Extract total comments
-        comments_match = re.search(r'Total comments processed: (\d+)', content)
+        # Extract total comments - try multiple patterns
+        comments_match = re.search(r'Total comments? (?:processed|analyzed): (\d+)', content)
+        if not comments_match:
+            comments_match = re.search(r'Comments? (?:processed|analyzed): (\d+)', content)
         total_comments = int(comments_match.group(1)) if comments_match else 500  # Default assumption
         
-        # Extract positive themes
+        # Extract positive themes - simpler extraction
         positive_themes = []
-        positive_section = re.search(r'\*\*Common Positive Themes:\*\*(.*?)\*\*Common Negative Themes:\*\*', content, re.DOTALL)
+        positive_section = re.search(r'\*\*Common Positive Themes:\*\*(.*?)(?=\*\*Common Negative Themes:|\*\*Viewer Suggestions:)', content, re.DOTALL)
         if positive_section:
-            theme_matches = re.findall(r'\*\s+\*\*(.*?):\*\*(.*?)(?=\*\s+\*\*|\n\n|\*\*)', positive_section.group(1), re.DOTALL)
-            for title, description in theme_matches:
-                positive_themes.append(f"{title.strip()} - {description.strip()}")
+            lines = positive_section.group(1).strip().split('\n')
+            for line in lines:
+                if line.strip().startswith('*') and '**' in line:
+                    # Extract theme title
+                    theme_match = re.search(r'\*\*([^*]+)\*\*', line)
+                    if theme_match:
+                        positive_themes.append(theme_match.group(1).strip())
         
         # Extract negative themes
         negative_themes = []
-        negative_section = re.search(r'\*\*Common Negative Themes:\*\*(.*?)\*\*(?:Viewer Suggestions|What Viewers Appreciate):\*\*', content, re.DOTALL)
+        negative_section = re.search(r'\*\*Common Negative Themes:\*\*(.*?)(?=\*\*Viewer Suggestions:|\*\*What Viewers Appreciate:)', content, re.DOTALL)
         if negative_section:
-            theme_matches = re.findall(r'\*\s+\*\*(.*?):\*\*(.*?)(?=\*\s+\*\*|\n\n|\*\*)', negative_section.group(1), re.DOTALL)
-            for title, description in theme_matches:
-                negative_themes.append(f"{title.strip()} - {description.strip()}")
+            lines = negative_section.group(1).strip().split('\n')
+            for line in lines:
+                if line.strip().startswith('*') and '**' in line:
+                    # Extract theme title
+                    theme_match = re.search(r'\*\*([^*]+)\*\*', line)
+                    if theme_match:
+                        negative_themes.append(theme_match.group(1).strip())
         
         # Extract viewer suggestions
         suggestions = []
-        suggestions_section = re.search(r'\*\*Viewer Suggestions:\*\*(.*?)\*\*(?:What Viewers Appreciate|Content Recommendations):\*\*', content, re.DOTALL)
+        suggestions_section = re.search(r'\*\*Viewer Suggestions:\*\*(.*?)(?=\*\*What Viewers Appreciate:|\*\*Content Recommendations:)', content, re.DOTALL)
         if suggestions_section:
-            suggestion_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', suggestions_section.group(1), re.DOTALL)
-            suggestions = [s.strip() for s in suggestion_matches if s.strip()]
+            lines = suggestions_section.group(1).strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('*') and not line.startswith('**'):
+                    # Clean up the suggestion text
+                    suggestion = re.sub(r'^\*\s*', '', line).strip()
+                    if suggestion:
+                        suggestions.append(suggestion)
         
         # Extract what viewers appreciate
         appreciation = []
-        appreciation_section = re.search(r'\*\*What Viewers Appreciate:\*\*(.*?)\*\*Content Recommendations:\*\*', content, re.DOTALL)
+        appreciation_section = re.search(r'\*\*What Viewers Appreciate:\*\*(.*?)(?=\*\*Content Recommendations:|\*\*Top Positive Comments:)', content, re.DOTALL)
         if appreciation_section:
-            appreciation_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', appreciation_section.group(1), re.DOTALL)
-            appreciation = [a.strip() for a in appreciation_matches if a.strip()]
+            lines = appreciation_section.group(1).strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('*') and not line.startswith('**'):
+                    # Clean up the appreciation text
+                    appreci = re.sub(r'^\*\s*', '', line).strip()
+                    if appreci:
+                        appreciation.append(appreci)
         
         # Extract content recommendations
         recommendations = []
-        recommendations_section = re.search(r'\*\*Content Recommendations:\*\*(.*?)\*\*Top Positive Comments:\*\*', content, re.DOTALL)
+        recommendations_section = re.search(r'\*\*Content Recommendations:\*\*(.*?)(?=\*\*Top Positive Comments:|\*\*Top Negative Comments:)', content, re.DOTALL)
         if recommendations_section:
-            rec_matches = re.findall(r'\*\s+(.*?)(?=\n\*|\n\n|\*\*)', recommendations_section.group(1), re.DOTALL)
-            recommendations = [r.strip() for r in rec_matches if r.strip()]
+            lines = recommendations_section.group(1).strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('*') and not line.startswith('**'):
+                    # Clean up the recommendation text
+                    rec = re.sub(r'^\*\s*', '', line).strip()
+                    if rec:
+                        recommendations.append(rec)
         
         # Extract top positive comments
         top_positive = []
-        positive_comments_section = re.search(r'\*\*Top Positive Comments:\*\*(.*?)\*\*Top Negative Comments:\*\*', content, re.DOTALL)
+        positive_comments_section = re.search(r'\*\*Top Positive Comments:\*\*(.*?)(?=\*\*Top Negative Comments:|\*\*QUALITY CHECK)', content, re.DOTALL)
         if positive_comments_section:
-            comment_matches = re.findall(r'\*\s+"([^"]+)"', positive_comments_section.group(1))
-            top_positive = comment_matches[:5]  # Limit to top 5
+            lines = positive_comments_section.group(1).strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('*') and '"' in line:
+                    # Extract comment text between quotes
+                    comment_match = re.search(r'"([^"]+)"', line)
+                    if comment_match:
+                        top_positive.append(comment_match.group(1))
         
         # Extract top negative comments
         top_negative = []
-        negative_comments_section = re.search(r'\*\*Top Negative Comments:\*\*(.*?)(?:QUALITY CHECK|\Z)', content, re.DOTALL)
+        negative_comments_section = re.search(r'\*\*Top Negative Comments:\*\*(.*?)(?=\*\*QUALITY CHECK|\Z)', content, re.DOTALL)
         if negative_comments_section:
-            comment_matches = re.findall(r'\*\s+"([^"]+)"', negative_comments_section.group(1))
-            top_negative = comment_matches[:5]  # Limit to top 5
-        
+            lines = negative_comments_section.group(1).strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('*') and '"' in line:
+                    # Extract comment text between quotes
+                    comment_match = re.search(r'"([^"]+)"', line)
+                    if comment_match:
+                        top_negative.append(comment_match.group(1))
+
+        # Limit the number of items in each category to avoid excessive data
+        max_items = 10
         return {
             'batchNumber': batch_number,
             'totalComments': total_comments,
             'positivePercentage': positive_pct,
             'neutralPercentage': neutral_pct,
             'negativePercentage': negative_pct,
-            'positiveThemes': positive_themes,
-            'negativeThemes': negative_themes,
-            'suggestions': suggestions,
-            'appreciation': appreciation,
-            'recommendations': recommendations,
-            'topPositiveComments': top_positive,
-            'topNegativeComments': top_negative,
+            'positiveThemes': positive_themes[:max_items],  # Limit to max_items
+            'negativeThemes': negative_themes[:max_items],
+            'suggestions': suggestions[:max_items],  # Limit to max_items
+            'appreciation': appreciation[:max_items],
+            'recommendations': recommendations[:max_items],
+            'topPositiveComments': top_positive[:max_items],  # Limit to top max_items
+            'topNegativeComments': top_negative[:max_items],
             'processingDate': processing_date
         }
         
     except Exception as e:
         safe_print(f"Error parsing batch analysis: {e}")
         return None
+
+@app.get("/api/comprehensive-analysis")
+async def get_comprehensive_analysis():
+    """
+    Get comprehensive analysis including YouTube analytics and batch analysis data
+    """
+    try:
+        # Extract comments from detailed sentiment results
+        all_positive_comments, all_negative_comments = extract_comments_from_detailed_results()
+        
+        # Get batch analysis data
+        batch_files = glob.glob("analyzed_comments_batch_*.txt")
+        batch_files.sort()
+        
+        # Initialize default values
+        batch_analyses = []
+        channel_name = "YouTube Channel Analysis"
+        total_comments = 0
+        overall_positive = 0
+        overall_neutral = 0
+        overall_negative = 0
+        
+        # Collect data from batch files (if any)
+        all_suggestions = []
+        all_recommendations = []
+        
+        if batch_files:
+            # Process existing batch files
+            for batch_file in batch_files:
+                try:
+                    with open(batch_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    batch_num = int(batch_file.split('_')[-1].replace('.txt', ''))
+                    analysis = parse_batch_analysis(content, batch_num)
+                    if analysis:
+                        batch_analyses.append(analysis)
+                        total_comments += analysis.get('totalComments', 0)
+                        overall_positive += analysis.get('positivePercentage', 0)
+                        overall_neutral += analysis.get('neutralPercentage', 0)
+                        overall_negative += analysis.get('negativePercentage', 0)
+                        
+                        # Only collect suggestions and recommendations (remove themes)
+                        all_suggestions.extend(analysis.get('suggestions', []))
+                        all_recommendations.extend(analysis.get('recommendations', []))
+                        
+                except Exception as e:
+                    safe_print(f"Error reading {batch_file}: {e}")
+                    continue
+        
+        # If no batch files, get data from detailed sentiment results
+        if not batch_files and (all_positive_comments or all_negative_comments):
+            total_comments = len(all_positive_comments) + len(all_negative_comments)
+            if total_comments > 0:
+                overall_positive = (len(all_positive_comments) / total_comments) * 100
+                overall_negative = (len(all_negative_comments) / total_comments) * 100
+                overall_neutral = 100 - overall_positive - overall_negative
+                
+                # Create a single analysis entry
+                batch_analyses = [{
+                    'batchNumber': 1,
+                    'totalComments': total_comments,
+                    'positivePercentage': overall_positive,
+                    'neutralPercentage': overall_neutral,
+                    'negativePercentage': overall_negative,
+                    'suggestions': ["Analysis completed from detailed sentiment results"],
+                    'recommendations': ["Review positive and negative comments for insights"],
+                    'processingDate': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }]
+        
+        # Calculate averages
+        num_batches = len(batch_analyses)
+        avg_positive = overall_positive / num_batches if num_batches > 0 else 0
+        avg_neutral = overall_neutral / num_batches if num_batches > 0 else 0
+        avg_negative = overall_negative / num_batches if num_batches > 0 else 0
+        
+        # Load or create YouTube analytics data
+        youtube_data = {}
+        channel_id = None
+        
+        # Try to load existing YouTube data
+        try:
+            if os.path.exists("youtube_analytics.json"):
+                with open("youtube_analytics.json", 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        youtube_data = json.loads(content)
+                        channel_id = youtube_data.get('channel_info', {}).get('channel_id', '')
+        except Exception as e:
+            safe_print(f"Could not load YouTube analytics: {e}")
+        
+        # If no valid channel data, create default structure
+        if not youtube_data.get('channel_info'):
+            youtube_data = {
+                'channel_info': {
+                    'channel_name': 'YouTube Channel',
+                    'subscriber_count': 'N/A',
+                    'video_count': 'N/A',
+                    'view_count': 'N/A',
+                    'description': 'Channel analysis data',
+                    'published_at': datetime.now().isoformat(),
+                    'thumbnail': None
+                },
+                'generated_at': datetime.now().isoformat()
+            }
+        
+        # Get new graph data from YouTube analytics (only if we have a valid channel ID)
+        monthly_views = []
+        monthly_subscribers = []
+        monthly_likes = []
+        views_vs_likes = []
+        views_vs_subscribers = []
+        subscribers_vs_likes = []
+        
+        # Try to get YouTube data if we have a valid setup
+        if (channel_id and 
+            channel_id != "REAL_CHANNEL_ID_WILL_BE_POPULATED_HERE" and 
+            len(channel_id) > 10 and
+            os.getenv('YOUTUBE_API_KEY')):
+            try:
+                from youtube_analytics import YouTubeChannelAnalytics
+                yt_analytics = YouTubeChannelAnalytics()
+                
+                monthly_views = yt_analytics.get_monthly_views_data(channel_id)
+                monthly_subscribers = yt_analytics.get_monthly_subscribers_data(channel_id)
+                monthly_likes = yt_analytics.get_monthly_likes_data(channel_id)
+                views_vs_likes = yt_analytics.get_views_vs_likes_data(channel_id)
+                views_vs_subscribers = yt_analytics.get_views_vs_subscribers_data(channel_id)
+                subscribers_vs_likes = yt_analytics.get_subscribers_vs_likes_data(channel_id)
+                
+                safe_print(f"Successfully retrieved YouTube analytics for channel: {channel_id}")
+                
+            except Exception as e:
+                safe_print(f"Error getting YouTube analytics: {e}")
+                # Continue with empty data rather than failing
+        else:
+            safe_print("Using default graph data - no valid YouTube channel ID configured")
+        
+        # Read processing status
+        processing_date = "Unknown"
+        try:
+            with open("llm_processing_status.json", 'r') as f:
+                status_data = json.load(f)
+                processing_date = status_data.get("processing_date", "Unknown")
+        except:
+            pass
+        
+        return JSONResponse(content={
+            'success': True,
+            'data': {
+                'channel_overview': {
+                    'channel_name': youtube_data.get('channel_info', {}).get('channel_name', 'YouTube Channel'),
+                    'subscriber_count': youtube_data.get('channel_info', {}).get('subscriber_count', 'N/A'),
+                    'establishment_date': youtube_data.get('channel_info', {}).get('published_at', 'Unknown'),
+                    'total_videos': youtube_data.get('channel_info', {}).get('video_count', 0),
+                    'total_views': youtube_data.get('channel_info', {}).get('view_count', 0)
+                },
+                'sentiment_scores': {
+                    'positive_percentage': round(avg_positive, 1),
+                    'neutral_percentage': round(avg_neutral, 1),
+                    'negative_percentage': round(avg_negative, 1)
+                },
+                'monthly_data': {
+                    'subscribers': youtube_data.get('monthly_analytics', {}).get('monthly_subscriber_data', []),
+                    'views': youtube_data.get('monthly_analytics', {}).get('monthly_view_data', [])
+                },
+                'new_graphs': {
+                    'monthly_views': monthly_views,
+                    'monthly_subscribers': monthly_subscribers,
+                    'monthly_likes': monthly_likes,
+                    'views_vs_likes': views_vs_likes,
+                    'views_vs_subscribers': views_vs_subscribers,
+                    'subscribers_vs_likes': subscribers_vs_likes
+                },
+                'all_positive_comments': all_positive_comments,  # All positive comments with scrollbar
+                'all_negative_comments': all_negative_comments,  # All negative comments with scrollbar
+                'viewer_suggestions': list(set(all_suggestions))[:10],
+                'content_recommendations': list(set(all_recommendations))[:10],
+                'total_comments': total_comments,
+                'processing_date': processing_date
+            }
+        })
+        
+    except Exception as e:
+        safe_print(f"Error getting comprehensive analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading comprehensive analysis: {str(e)}")
+
+def extract_comments_from_detailed_results():
+    """Extract positive and negative comments from detailed_sentiment_results.txt"""
+    positive_comments = []
+    negative_comments = []
+    
+    try:
+        if os.path.exists("detailed_sentiment_results.txt"):
+            with open("detailed_sentiment_results.txt", 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Split by comment sections
+            comment_sections = content.split("COMMENT #")
+            
+            for section in comment_sections[1:]:  # Skip the header
+                try:
+                    lines = section.strip().split('\n')
+                    
+                    # Extract text and sentiment
+                    text_line = None
+                    sentiment_line = None
+                    score_line = None
+                    
+                    for line in lines:
+                        if line.startswith("Text: "):
+                            text_line = line[6:].strip()  # Remove "Text: "
+                        elif line.startswith("Sentiment: "):
+                            sentiment_line = line[11:].strip()  # Remove "Sentiment: "
+                        elif line.startswith("Score: "):
+                            score_line = line[7:].strip()  # Remove "Score: "
+                    
+                    if text_line and sentiment_line and score_line:
+                        try:
+                            score = int(score_line.split('/')[0])
+                            
+                            comment_data = {
+                                "text": text_line,
+                                "sentiment": sentiment_line,
+                                "score": score
+                            }
+                            
+                            # Categorize based on sentiment and score
+                            if sentiment_line.lower() == "positive" or (sentiment_line.lower() == "neutral" and score >= 70):
+                                positive_comments.append(comment_data)
+                            elif sentiment_line.lower() == "negative" or (sentiment_line.lower() == "neutral" and score <= 40):
+                                negative_comments.append(comment_data)
+                                
+                        except (ValueError, IndexError):
+                            continue
+                            
+                except Exception as e:
+                    safe_print(f"Error processing comment section: {e}")
+                    continue
+                    
+        # Sort by score (highest first for positive, lowest first for negative)
+        positive_comments.sort(key=lambda x: x["score"], reverse=True)
+        negative_comments.sort(key=lambda x: x["score"])
+        
+        safe_print(f"Extracted {len(positive_comments)} positive and {len(negative_comments)} negative comments")
+        
+    except Exception as e:
+        safe_print(f"Error extracting comments from detailed results: {e}")
+    
+    return positive_comments, negative_comments

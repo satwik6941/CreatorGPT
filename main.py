@@ -84,15 +84,19 @@ class CreatorGPTAnalyzer:
         self.log_progress("youtube_start", "Starting YouTube comment extraction...", 10)
         
         try:
+            # Get the absolute path to youtube_improved.py to handle path encoding issues
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            youtube_script = os.path.join(script_dir, 'youtube_improved.py')
+            
             # Run youtube_improved.py with the channel ID as argument
             process = subprocess.Popen(
-                [sys.executable, 'youtube_improved.py', self.channel_id],
+                [sys.executable, youtube_script, self.channel_id],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                cwd=os.getcwd(),
+                cwd=script_dir,
                 bufsize=1,
                 universal_newlines=True
             )
@@ -167,15 +171,19 @@ class CreatorGPTAnalyzer:
         self.log_progress("llm_start", "Starting LLM processing of comments...", 40)
         
         try:
+            # Get the absolute path to llm.py to handle path encoding issues
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            llm_script = os.path.join(script_dir, 'llm.py')
+            
             # Run llm.py
             process = subprocess.Popen(
-                [sys.executable, 'llm.py'],
+                [sys.executable, llm_script],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                cwd=os.getcwd(),
+                cwd=script_dir,
                 bufsize=1,
                 universal_newlines=True
             )
