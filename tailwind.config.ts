@@ -71,7 +71,10 @@ export default {
 				'bright-red': '#FF3B30',
 				'neon-green': '#30FF30',
 				'dark-surface': '#1A1A1A',
-				'glass': 'rgba(255, 255, 255, 0.05)'
+				'glass': 'rgba(255, 255, 255, 0.05)',
+				'orange': '#F59E0B',
+				'purple': '#8B5CF6',
+				'cyan': '#06B6D4'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

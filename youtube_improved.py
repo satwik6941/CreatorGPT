@@ -261,6 +261,34 @@ def main():
         print(f"Published On: {channel_published}")
         print(f"Subscribers: {subscriber_count}")
         
+        # Save channel information to JSON file for dashboard use
+        import json
+        from datetime import datetime
+        channel_data = {
+            'channel_info': {
+                'channel_id': channel_id,
+                'channel_name': channel_title,
+                'subscriber_count': subscriber_count,
+                'video_count': channel['statistics'].get('videoCount', 'Unknown'),
+                'view_count': channel['statistics'].get('viewCount', 'Unknown'),
+                'description': channel['snippet'].get('description', ''),
+                'published_at': channel_published,
+                'thumbnail': channel['snippet']['thumbnails']['high']['url'] if 'thumbnails' in channel['snippet'] else None
+            },
+            'generated_at': datetime.now().isoformat(),
+            'monthly_analytics': {
+                'monthly_subscriber_data': [],
+                'monthly_view_data': []
+            }
+        }
+        
+        try:
+            with open('youtube_analytics.json', 'w', encoding='utf-8') as f:
+                json.dump(channel_data, f, indent=2, ensure_ascii=False)
+            print(f"Saved channel data to youtube_analytics.json")
+        except Exception as e:
+            print(f"Warning: Could not save channel data: {e}")
+        
         log_progress("extracting_comments", "Starting comment extraction...", 30)
         
         # Collect comments

@@ -221,9 +221,14 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
       if (response.success && response.channelData && response.batchAnalyses) {
         const { channelData, batchAnalyses } = response;
         
+        // Ensure we don't show test channel data
+        const actualChannelName = channelData.channelName && 
+                                 channelData.channelName.toLowerCase() !== 'test channel' ? 
+                                 channelData.channelName : 'YouTube Channel';
+        
         // Transform real data to match dashboard format
         const transformedData: ChannelStats = {
-          channel_name: channelData.channelName,
+          channel_name: actualChannelName,
           subscriber_count: 'N/A', // Not available in batch analysis
           total_videos: 0, // Not available in batch analysis
           total_comments: channelData.totalComments,
@@ -370,7 +375,13 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
               <div>
                 <h1 className="text-3xl font-bold text-white">Dashboard & Analytics</h1>
                 <p className="text-gray-400 mt-1">
-                  Comprehensive insights for {dashboardData?.channel_name || 'Your Channel'}
+                  Comprehensive insights for {
+                    ((analysisData?.channel_overview?.channel_name || dashboardData?.channel_name) && 
+                     (analysisData?.channel_overview?.channel_name !== 'test channel' && 
+                      dashboardData?.channel_name !== 'test channel')) ?
+                    (analysisData?.channel_overview?.channel_name || dashboardData?.channel_name) :
+                    'Your Channel'
+                  }
                 </p>
               </div>
             </div>
@@ -384,19 +395,64 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Channel Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="glass-card border-electric-blue/20 hover:border-electric-blue/40 transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-400">Total Comments</CardTitle>
-              <MessageSquare className="h-4 w-4 text-electric-blue" />
+        {/* Channel Header - Prominently display channel name and subscriber count */}
+        <div className="mb-8">
+          <Card className="glass-card border-electric-blue/30 hover:border-electric-blue/50 transition-all duration-300">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-6">
+                  <div className="bg-gradient-to-r from-electric-blue to-neon-green p-4 rounded-full">
+                    <Youtube className="h-12 w-12 text-black" />
+                  </div>
+                  <div>
+                    <h2 className="text-4xl font-bold text-white mb-2">
+                      {(() => {
+                        const channelName = analysisData?.channel_overview?.channel_name || dashboardData?.channel_name;
+                        // Never show test channel data
+                        if (channelName && channelName.toLowerCase() !== 'test channel') {
+                          return channelName;
+                        }
+                        return 'YouTube Channel';
+                      })()}
+                    </h2>
+                    <div className="flex items-center space-x-6 text-lg">
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-6 w-6 text-electric-blue" />
+                        <span className="text-white font-semibold">
+                          {analysisData?.channel_overview?.subscriber_count || 'N/A'} subscribers
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Eye className="h-6 w-6 text-neon-green" />
+                        <span className="text-white font-semibold">
+                          {analysisData?.channel_overview?.total_views?.toLocaleString() || 'N/A'} total views
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <MessageSquare className="h-6 w-6 text-orange" />
+                        <span className="text-white font-semibold">
+                          {analysisData?.total_comments?.toLocaleString() || dashboardData?.total_comments?.toLocaleString() || '0'} comments analyzed
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-400 mb-1">Channel established</div>
+                  <div className="text-white font-semibold">
+                    {analysisData?.channel_overview?.establishment_date ? 
+                      new Date(analysisData.channel_overview.establishment_date).toLocaleDateString() : 
+                      'N/A'
+                    }
+                  </div>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{dashboardData?.total_comments?.toLocaleString() || '0'}</div>
-              <p className="text-xs text-gray-500 mt-1">Analyzed by AI</p>
-            </CardContent>
           </Card>
+        </div>
 
+        {/* Analytics Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="glass-card border-neon-green/20 hover:border-neon-green/40 transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-400">Positive Sentiment</CardTitle>
@@ -404,7 +460,8 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-neon-green">
-                {dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Positive')?.percentage?.toFixed(1) || '0'}%
+                {analysisData?.sentiment_scores?.positive_percentage?.toFixed(1) || 
+                 dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Positive')?.percentage?.toFixed(1) || '0'}%
               </div>
               <p className="text-xs text-gray-500 mt-1">Overall positivity</p>
             </CardContent>
@@ -417,9 +474,24 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-bright-red">
-                {dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Negative')?.percentage?.toFixed(1) || '0'}%
+                {analysisData?.sentiment_scores?.negative_percentage?.toFixed(1) || 
+                 dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Negative')?.percentage?.toFixed(1) || '0'}%
               </div>
               <p className="text-xs text-gray-500 mt-1">Areas to improve</p>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-electric-blue/20 hover:border-electric-blue/40 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-400">Neutral Sentiment</CardTitle>
+              <BarChart3 className="h-4 w-4 text-electric-blue" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-electric-blue">
+                {analysisData?.sentiment_scores?.neutral_percentage?.toFixed(1) || 
+                 dashboardData?.sentiment_distribution?.find(s => s.sentiment === 'Neutral')?.percentage?.toFixed(1) || '0'}%
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Balanced feedback</p>
             </CardContent>
           </Card>
 
@@ -430,9 +502,219 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange">
-                {dashboardData?.channel_created || 'N/A'}
+                {analysisData?.processing_date || dashboardData?.channel_created || 'N/A'}
               </div>
               <p className="text-xs text-gray-500 mt-1">Last processed</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* New Analytics Graphs - Monthly Trends */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Monthly Views */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <Eye className="h-5 w-5 mr-2 text-electric-blue" />
+                Monthly Views (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analysisData?.new_graphs?.monthly_views || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Line type="monotone" dataKey="views" stroke={COLORS.primary} strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.monthly_views || analysisData?.new_graphs?.monthly_views?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No monthly views data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Monthly Subscribers */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <Users className="h-5 w-5 mr-2 text-neon-green" />
+                Monthly Subscribers (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analysisData?.new_graphs?.monthly_subscribers || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Line type="monotone" dataKey="subscribers" stroke={COLORS.positive} strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.monthly_subscribers || analysisData?.new_graphs?.monthly_subscribers?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No monthly subscribers data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Monthly Likes */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <Heart className="h-5 w-5 mr-2 text-bright-red" />
+                Monthly Likes (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analysisData?.new_graphs?.monthly_likes || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Line type="monotone" dataKey="likes" stroke={COLORS.negative} strokeWidth={3} />
+                </LineChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.monthly_likes || analysisData?.new_graphs?.monthly_likes?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No monthly likes data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Views vs Likes */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-purple" />
+                Views vs Likes (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analysisData?.new_graphs?.views_vs_likes || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Bar dataKey="views" fill={COLORS.primary} />
+                  <Bar dataKey="likes" fill={COLORS.negative} />
+                </BarChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.views_vs_likes || analysisData?.new_graphs?.views_vs_likes?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No views vs likes data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Views vs Subscribers */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-orange" />
+                Views vs Subscribers (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analysisData?.new_graphs?.views_vs_subscribers || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Bar dataKey="views" fill={COLORS.primary} />
+                  <Bar dataKey="subscribers" fill={COLORS.positive} />
+                </BarChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.views_vs_subscribers || analysisData?.new_graphs?.views_vs_subscribers?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No views vs subscribers data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Subscribers vs Likes */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold text-white flex items-center">
+                <ThumbsUp className="h-5 w-5 mr-2 text-cyan" />
+                Subscribers vs Likes (Past 1 Year)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analysisData?.new_graphs?.subscribers_vs_likes || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={COLORS.chart.grid} />
+                  <XAxis dataKey="month" stroke={COLORS.chart.text} />
+                  <YAxis stroke={COLORS.chart.text} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1A1A1A', 
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                  />
+                  <Bar dataKey="subscribers" fill={COLORS.positive} />
+                  <Bar dataKey="likes" fill={COLORS.negative} />
+                </BarChart>
+              </ResponsiveContainer>
+              {(!analysisData?.new_graphs?.subscribers_vs_likes || analysisData?.new_graphs?.subscribers_vs_likes?.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <ThumbsUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No subscribers vs likes data available</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
