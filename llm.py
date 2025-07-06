@@ -137,25 +137,25 @@ SENTIMENT BREAKDOWN:
 
 DETAILED INSIGHTS:
 **Common Positive Themes:**
-[List 3-5 themes with specific examples from comments]
+[List 3-5 themes with specific examples from comments about of the content/creator/channel]
 
 **Common Negative Themes:**
-[List 3-5 themes with specific examples from comments]
+[List 3-5 themes with specific examples from comments about of the content/creator/channel]
 
 **Viewer Suggestions:**
-[Specific requests/improvements mentioned by viewers]
+[Specific requests/improvements mentioned by viewers about of the content/creator/channel]
 
 **What Viewers Appreciate:**
-[What viewers like about content/creator with examples]
+[What viewers like about content/creator with examples about of the content/creator/channel]
 
 **Content Recommendations:**
-[Specific suggestions for improving content based on feedback]
+[Specific suggestions for improving content based on feedback about of the content/creator/channel]
 
 **Top Positive Comments:**
-[List 3-5 positive comments with sentiment]
+[List 3-5 positive comments with sentiment about of the content/creator/channel]
 
 **Top Negative Comments:**
-[List 3-5 negative comments with sentiment]
+[List 3-5 negative comments with sentiment about of the content/creator/channel]
 
 QUALITY CHECK:
 ✓ All comments processed: [Yes/No]
