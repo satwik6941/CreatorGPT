@@ -1818,10 +1818,7 @@ async def get_comprehensive_analysis():
     Get comprehensive analysis including YouTube analytics and batch analysis data
     """
     try:
-        # Extract comments from detailed sentiment results
-        all_positive_comments, all_negative_comments = extract_comments_from_detailed_results()
-        
-        # Get batch analysis data
+        # Get batch analysis data - ONLY use insights from batch files
         batch_files = glob.glob("analyzed_comments_batch_*.txt")
         batch_files.sort()
         
@@ -1833,9 +1830,14 @@ async def get_comprehensive_analysis():
         overall_neutral = 0
         overall_negative = 0
         
-        # Collect data from batch files (if any)
+        # Collect data from batch files (if any) - ALL insights come from here
         all_suggestions = []
         all_recommendations = []
+        all_positive_comments = []
+        all_negative_comments = []
+        all_positive_themes = []
+        all_negative_themes = []
+        all_appreciation = []
         
         if batch_files:
             # Process existing batch files
@@ -1853,33 +1855,48 @@ async def get_comprehensive_analysis():
                         overall_neutral += analysis.get('neutralPercentage', 0)
                         overall_negative += analysis.get('negativePercentage', 0)
                         
-                        # Only collect suggestions and recommendations (remove themes)
+                        # Collect ALL insights from batch files ONLY
                         all_suggestions.extend(analysis.get('suggestions', []))
                         all_recommendations.extend(analysis.get('recommendations', []))
+                        all_positive_themes.extend(analysis.get('positiveThemes', []))
+                        all_negative_themes.extend(analysis.get('negativeThemes', []))
+                        all_appreciation.extend(analysis.get('appreciation', []))
+                        
+                        # Extract actual comment text from batch files
+                        top_positive = analysis.get('topPositiveComments', [])
+                        top_negative = analysis.get('topNegativeComments', [])
+                        
+                        # Format comments for dashboard display
+                        for comment in top_positive:
+                            all_positive_comments.append({
+                                "text": comment,
+                                "sentiment": "positive",
+                                "score": 85,  # Default high score for positive comments
+                                "source": f"batch_{batch_num}"
+                            })
+                        
+                        for comment in top_negative:
+                            all_negative_comments.append({
+                                "text": comment,
+                                "sentiment": "negative", 
+                                "score": 25,  # Default low score for negative comments
+                                "source": f"batch_{batch_num}"
+                            })
                         
                 except Exception as e:
                     safe_print(f"Error reading {batch_file}: {e}")
                     continue
         
-        # If no batch files, get data from detailed sentiment results
-        if not batch_files and (all_positive_comments or all_negative_comments):
-            total_comments = len(all_positive_comments) + len(all_negative_comments)
-            if total_comments > 0:
-                overall_positive = (len(all_positive_comments) / total_comments) * 100
-                overall_negative = (len(all_negative_comments) / total_comments) * 100
-                overall_neutral = 100 - overall_positive - overall_negative
-                
-                # Create a single analysis entry
-                batch_analyses = [{
-                    'batchNumber': 1,
-                    'totalComments': total_comments,
-                    'positivePercentage': overall_positive,
-                    'neutralPercentage': overall_neutral,
-                    'negativePercentage': overall_negative,
-                    'suggestions': ["Analysis completed from detailed sentiment results"],
-                    'recommendations': ["Review positive and negative comments for insights"],
-                    'processingDate': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }]
+        # If no batch files exist, return empty insights (don't use other sources)
+        if not batch_files:
+            safe_print("No batch analysis files found - dashboard insights will be empty")
+            # Keep empty arrays for insights
+            all_positive_comments = []
+            all_negative_comments = []
+            total_comments = 0
+            overall_positive = 0
+            overall_neutral = 0
+            overall_negative = 0
         
         # Calculate averages
         num_batches = len(batch_analyses)
@@ -2039,10 +2056,13 @@ async def get_comprehensive_analysis():
                     'views_vs_subscribers': views_vs_subscribers,
                     'subscribers_vs_likes': subscribers_vs_likes
                 },
-                'all_positive_comments': all_positive_comments,  # All positive comments with scrollbar
-                'all_negative_comments': all_negative_comments,  # All negative comments with scrollbar
-                'viewer_suggestions': list(set(all_suggestions))[:10],
-                'content_recommendations': list(set(all_recommendations))[:10],
+                'all_positive_comments': all_positive_comments,  # Only from batch files
+                'all_negative_comments': all_negative_comments,  # Only from batch files  
+                'positive_themes': list(set(all_positive_themes))[:8],  # Only from batch files
+                'negative_themes': list(set(all_negative_themes))[:8],  # Only from batch files
+                'viewer_suggestions': list(set(all_suggestions))[:10],  # Only from batch files
+                'content_recommendations': list(set(all_recommendations))[:10],  # Only from batch files
+                'viewer_appreciation': list(set(all_appreciation))[:8],  # Only from batch files
                 'total_comments': total_comments,
                 'processing_date': processing_date
             }

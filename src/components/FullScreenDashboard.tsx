@@ -128,10 +128,13 @@ interface ComprehensiveAnalysis {
     views_vs_subscribers: Array<{ month: string; views: number; subscribers: number }>;
     subscribers_vs_likes: Array<{ month: string; subscribers: number; likes: number }>;
   };
-  all_positive_comments: Array<{ text: string; sentiment: string; score: number }>;
-  all_negative_comments: Array<{ text: string; sentiment: string; score: number }>;
+  all_positive_comments: Array<{ text: string; sentiment: string; score: number; source?: string }>;
+  all_negative_comments: Array<{ text: string; sentiment: string; score: number; source?: string }>;
+  positive_themes: string[];
+  negative_themes: string[];
   viewer_suggestions: string[];
   content_recommendations: string[];
+  viewer_appreciation: string[];
   total_comments: number;
   processing_date: string;
 }
@@ -786,6 +789,142 @@ const FullScreenDashboard: React.FC<FullScreenDashboardProps> = ({ onNewAnalysis
                   <Bar dataKey="comments" fill={COLORS.primary} />
                 </BarChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Insights from Batch Analysis */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Positive Themes */}
+          <Card className="glass-card border-neon-green/20 hover:border-neon-green/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-neon-green flex items-center">
+                <ThumbsUp className="h-5 w-5 mr-2" />
+                Positive Themes
+                <Badge variant="secondary" className="ml-2 bg-neon-green/20 text-neon-green border-neon-green/30">
+                  {analysisData?.positive_themes?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analysisData?.positive_themes?.length ? (
+                  analysisData.positive_themes.map((theme, index) => (
+                    <div key={index} className="p-2 rounded-lg bg-neon-green/10 border border-neon-green/20">
+                      <p className="text-sm text-gray-300">{theme}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No positive themes from batch analysis yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Negative Themes */}
+          <Card className="glass-card border-bright-red/20 hover:border-bright-red/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-bright-red flex items-center">
+                <TrendingDown className="h-5 w-5 mr-2" />
+                Negative Themes
+                <Badge variant="secondary" className="ml-2 bg-bright-red/20 text-bright-red border-bright-red/30">
+                  {analysisData?.negative_themes?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analysisData?.negative_themes?.length ? (
+                  analysisData.negative_themes.map((theme, index) => (
+                    <div key={index} className="p-2 rounded-lg bg-bright-red/10 border border-bright-red/20">
+                      <p className="text-sm text-gray-300">{theme}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No negative themes from batch analysis yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Viewer Appreciation */}
+          <Card className="glass-card border-electric-blue/20 hover:border-electric-blue/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-electric-blue flex items-center">
+                <Heart className="h-5 w-5 mr-2" />
+                What Viewers Appreciate
+                <Badge variant="secondary" className="ml-2 bg-electric-blue/20 text-electric-blue border-electric-blue/30">
+                  {analysisData?.viewer_appreciation?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analysisData?.viewer_appreciation?.length ? (
+                  analysisData.viewer_appreciation.map((appreciation, index) => (
+                    <div key={index} className="p-2 rounded-lg bg-electric-blue/10 border border-electric-blue/20">
+                      <p className="text-sm text-gray-300">{appreciation}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No viewer appreciation from batch analysis yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Suggestions and Recommendations */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Viewer Suggestions */}
+          <Card className="glass-card border-orange/20 hover:border-orange/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-orange flex items-center">
+                <MessageSquare className="h-5 w-5 mr-2" />
+                Viewer Suggestions
+                <Badge variant="secondary" className="ml-2 bg-orange/20 text-orange border-orange/30">
+                  {analysisData?.viewer_suggestions?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analysisData?.viewer_suggestions?.length ? (
+                  analysisData.viewer_suggestions.map((suggestion, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-orange/10 border border-orange/20">
+                      <p className="text-sm text-gray-300">{suggestion}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No viewer suggestions from batch analysis yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Content Recommendations */}
+          <Card className="glass-card border-purple/20 hover:border-purple/40 transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-purple flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Content Recommendations
+                <Badge variant="secondary" className="ml-2 bg-purple/20 text-purple border-purple/30">
+                  {analysisData?.content_recommendations?.length || 0}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analysisData?.content_recommendations?.length ? (
+                  analysisData.content_recommendations.map((recommendation, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-purple/10 border border-purple/20">
+                      <p className="text-sm text-gray-300">{recommendation}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No content recommendations from batch analysis yet</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

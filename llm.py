@@ -6,13 +6,12 @@ import dotenv as env
 import pathlib
 import time
 import json
+from datetime import datetime
 
 env.load_dotenv()
 
 def log_progress(step, message, progress, **kwargs):
     """Log progress in a format that the API can parse"""
-    from datetime import datetime
-    
     progress_data = {
         "step": step,
         "message": message,
