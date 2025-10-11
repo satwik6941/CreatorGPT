@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+// Use environment variable for API base URL, fallback to localhost for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // API service for communicating with the backend
 export const apiService = {
@@ -63,7 +64,9 @@ export const apiService = {
 
   // WebSocket connection for real-time updates
   createWebSocket(onMessage: (data: WebSocketMessage) => void, onError?: (error: Event) => void) {
-    const ws = new WebSocket(`ws://localhost:8000/ws/analysis`);
+    // Convert HTTP URL to WebSocket URL
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
+    const ws = new WebSocket(`${wsUrl}/ws/analysis`);
     
     ws.onopen = () => {
       console.log('WebSocket connected');
