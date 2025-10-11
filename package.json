@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "security-audit": "npm audit",
     "security-fix": "npm audit fix --legacy-peer-deps",
-    "api": "python run_api.py",
+    "api": "python backend\\run_api.py",
     "start": "concurrently \"npm run api\" \"npm run dev\""
   },
   "dependencies": {

@@ -20,6 +20,14 @@ import contextlib
 import glob
 from collections import Counter
 
+# Get project root directory (parent of backend folder)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+def get_project_path(filename: str) -> str:
+    """Get the full path to a file in the project root directory"""
+    return os.path.join(PROJECT_ROOT, filename)
+
 def safe_print(message: str):
     """
     Safely print messages that may contain Unicode characters.
@@ -84,10 +92,11 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # Mount static files directory for serving dashboard images and charts
-# Create charts directory if it doesn't exist
-os.makedirs("charts", exist_ok=True)
-app.mount("/static", StaticFiles(directory="."), name="static")
-app.mount("/charts", StaticFiles(directory="charts"), name="charts")
+# Create charts directory if it doesn't exist (in parent directory)
+charts_dir = get_project_path("charts")
+os.makedirs(charts_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=PROJECT_ROOT), name="static")
+app.mount("/charts", StaticFiles(directory=charts_dir), name="charts")
 
 # Add CORS middleware
 app.add_middleware(
@@ -340,7 +349,7 @@ def run_command_with_output(command, input_text=None):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=os.getcwd(),
+            cwd=PROJECT_ROOT,  # Use project root as working directory
             bufsize=1,
             universal_newlines=True
         )
@@ -459,8 +468,9 @@ def run_command_with_output(command, input_text=None):
 def extract_channel_info():
     """Extract channel info from the generated CSV files"""
     try:
-        if os.path.exists('all_comments.csv'):
-            df = pd.read_csv('all_comments.csv')
+        all_comments_path = get_project_path('all_comments.csv')
+        if os.path.exists(all_comments_path):
+            df = pd.read_csv(all_comments_path)
             if len(df) > 0:
                 channel_name = df['channel_name'].iloc[0] if 'channel_name' in df.columns else "Unknown"
                 total_comments = len(df)
@@ -486,8 +496,8 @@ def parse_analyzed_content() -> List[AnalyzedContent]:
     """Parse analyzed content from batch files"""
     analyzed_content = []
     
-    # Find all analyzed batch files
-    batch_files = glob.glob('analyzed_comments_batch_*.txt')
+    # Find all analyzed batch files in project root
+    batch_files = glob.glob(get_project_path('analyzed_comments_batch_*.txt'))
     batch_files.sort(key=lambda x: int(re.search(r'batch_(\d+)', x).group(1)))
     
     for file_path in batch_files:
@@ -602,8 +612,9 @@ def generate_chart_data() -> EnhancedChartData:
         word_frequency_positive = []
         word_frequency_negative = []
         
-        if os.path.exists('sentiment_analyzed_comments.csv'):
-            df = pd.read_csv('sentiment_analyzed_comments.csv')
+        sentiment_csv_path = get_project_path('sentiment_analyzed_comments.csv')
+        if os.path.exists(sentiment_csv_path):
+            df = pd.read_csv(sentiment_csv_path)
             sentiment_data['total_comments'] = len(df)
             
             if 'sentiment_score' in df.columns:
@@ -740,12 +751,13 @@ async def run_analysis_pipeline(channel_id: str):
         
         try:
             # Run main.py with the channel ID as argument
+            main_script_path = os.path.join(SCRIPT_DIR, 'main.py')
             process = subprocess.Popen(
-                [sys.executable, 'main.py', channel_id.strip()],
+                [sys.executable, main_script_path, channel_id.strip()],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                cwd=os.getcwd(),
+                cwd=PROJECT_ROOT,  # Use project root as working directory
                 bufsize=1,
                 universal_newlines=True
             )
@@ -840,9 +852,10 @@ async def run_analysis_pipeline(channel_id: str):
                     update_analysis_state({"channel_info": channel_info})
                 
                 # Add completion summary from sentiment analysis if available
-                if os.path.exists('sentiment_analyzed_comments.csv'):
+                sentiment_csv_path = get_project_path('sentiment_analyzed_comments.csv')
+                if os.path.exists(sentiment_csv_path):
                     try:
-                        df = pd.read_csv('sentiment_analyzed_comments.csv')
+                        df = pd.read_csv(sentiment_csv_path)
                         if 'sentiment_score' in df.columns and 'sentiment' in df.columns:
                             avg_score = df['sentiment_score'].mean()
                             positive_pct = (df['sentiment'] == 'Positive').mean() * 100
@@ -1071,8 +1084,9 @@ async def get_results():
         results = {}
         
         # Check for sentiment analysis results
-        if os.path.exists('sentiment_analyzed_comments.csv'):
-            df = pd.read_csv('sentiment_analyzed_comments.csv')
+        sentiment_csv_path = get_project_path('sentiment_analyzed_comments.csv')
+        if os.path.exists(sentiment_csv_path):
+            df = pd.read_csv(sentiment_csv_path)
             
             # Calculate summary statistics
             if 'sentiment_score' in df.columns:
@@ -1089,8 +1103,9 @@ async def get_results():
                 }
         
         # Check for detailed sentiment results
-        if os.path.exists('detailed_sentiment_results.txt'):
-            with open('detailed_sentiment_results.txt', 'r', encoding='utf-8') as f:
+        results_txt_path = get_project_path('detailed_sentiment_results.txt')
+        if os.path.exists(results_txt_path):
+            with open(results_txt_path, 'r', encoding='utf-8') as f:
                 results['detailed_results'] = f.read()
         
         # Check for generated files
@@ -1104,7 +1119,8 @@ async def get_results():
         ]
         
         for file in files_to_check:
-            if os.path.exists(file):
+            file_path = get_project_path(file)
+            if os.path.exists(file_path):
                 generated_files.append(file)
         
         results['generated_files'] = generated_files
@@ -1123,7 +1139,7 @@ app.mount("/charts", StaticFiles(directory="charts"), name="charts")
 @app.get("/api/dashboard-image")
 async def get_dashboard_image():
     """Serve the main dashboard image"""
-    dashboard_path = "sentiment_analysis_dashboard.png"
+    dashboard_path = get_project_path("sentiment_analysis_dashboard.png")
     if os.path.exists(dashboard_path):
         return FileResponse(dashboard_path, media_type="image/png", headers={
             "Access-Control-Allow-Origin": "*",
@@ -1135,7 +1151,7 @@ async def get_dashboard_image():
 @app.get("/api/chart/{chart_name}")
 async def get_chart_image(chart_name: str):
     """Serve individual chart images"""
-    chart_path = f"charts/{chart_name}"
+    chart_path = get_project_path(f"charts/{chart_name}")
     if os.path.exists(chart_path) and chart_name.endswith('.png'):
         return FileResponse(chart_path, media_type="image/png", headers={
             "Access-Control-Allow-Origin": "*",

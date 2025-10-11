@@ -7,8 +7,9 @@ import os
 import sys
 
 if __name__ == "__main__":
-    # Add current directory to Python path
-    sys.path.insert(0, os.path.dirname(__file__))
+    # Add backend directory to Python path
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, backend_dir)
     
     print("Starting CreatorGPT FastAPI server...")
     print("API will be available at: http://localhost:8000")

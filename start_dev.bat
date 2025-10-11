@@ -19,7 +19,7 @@ if %errorlevel% neq 0 (
 )
 
 echo Installing Python dependencies...
-pip install -r requirements.txt
+pip install -r backend\requirements.txt
 
 echo.
 echo Installing Node.js dependencies...
@@ -27,7 +27,7 @@ npm install
 
 echo.
 echo Starting API server...
-start "CreatorGPT API" cmd /k "python api.py"
+start "CreatorGPT API" cmd /k "python backend\api.py"
 
 echo Waiting for API to start...
 timeout /t 5 /nobreak >nul

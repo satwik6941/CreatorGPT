@@ -8,6 +8,10 @@ if __name__ == "__main__":
     # Set environment for development
     os.environ['ENVIRONMENT'] = 'development'
     
+    # Add backend directory to Python path
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, backend_dir)
+    
     print("🚀 Starting CreatorGPT API Server...")
     print("📡 API will be available at: http://localhost:8000")
     print("📊 WebSocket endpoint: ws://localhost:8000/ws/analysis")

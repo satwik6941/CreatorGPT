@@ -13,6 +13,13 @@ class CreatorGPTAnalyzer:
         self.channel_name = None
         self.total_comments = 0
         self.start_time = None
+        # Get project root directory (parent of backend folder)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.project_root = os.path.dirname(script_dir)
+    
+    def get_project_path(self, filename):
+        """Get the full path to a file in the project root directory"""
+        return os.path.join(self.project_root, filename)
         
     def print_banner(self):
         print("\n" + "="*60)
@@ -86,9 +93,11 @@ class CreatorGPTAnalyzer:
         try:
             # Get the absolute path to youtube_improved.py to handle path encoding issues
             script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)  # Parent directory (project root)
             youtube_script = os.path.join(script_dir, 'youtube_improved.py')
             
             # Run youtube_improved.py with the channel ID as argument
+            # Use project root as working directory so CSV files are created there
             process = subprocess.Popen(
                 [sys.executable, youtube_script, self.channel_id],
                 stdout=subprocess.PIPE,
@@ -96,7 +105,7 @@ class CreatorGPTAnalyzer:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                cwd=script_dir,
+                cwd=project_root,
                 bufsize=1,
                 universal_newlines=True
             )
@@ -127,8 +136,9 @@ class CreatorGPTAnalyzer:
                 print("Generated files:")
                 
                 # Check what files were created
-                if os.path.exists('all_comments.csv'):
-                    df = pd.read_csv('all_comments.csv')
+                all_comments_path = self.get_project_path('all_comments.csv')
+                if os.path.exists(all_comments_path):
+                    df = pd.read_csv(all_comments_path)
                     self.total_comments = len(df)
                     print(f"   * all_comments.csv ({self.total_comments:,} comments)")
                     
@@ -136,7 +146,8 @@ class CreatorGPTAnalyzer:
                     if hasattr(self, 'channel_name') and self.channel_name:
                         print(f"   * Channel: {self.channel_name}")
                 
-                if os.path.exists('cleaned_all_comments.csv'):
+                cleaned_comments_path = self.get_project_path('cleaned_all_comments.csv')
+                if os.path.exists(cleaned_comments_path):
                     print("   * cleaned_all_comments.csv (preprocessed)")
                     
                 return True
@@ -161,7 +172,8 @@ class CreatorGPTAnalyzer:
         print("-" * 40)
         
         # Check if cleaned_all_comments.csv exists
-        if not os.path.exists('cleaned_all_comments.csv'):
+        cleaned_comments_path = self.get_project_path('cleaned_all_comments.csv')
+        if not os.path.exists(cleaned_comments_path):
             error_msg = "cleaned_all_comments.csv not found!"
             self.log_progress("llm_error", error_msg, 40, error=error_msg)
             print(f"ERROR: {error_msg}")
@@ -173,9 +185,11 @@ class CreatorGPTAnalyzer:
         try:
             # Get the absolute path to llm.py to handle path encoding issues
             script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)  # Parent directory (project root)
             llm_script = os.path.join(script_dir, 'llm.py')
             
             # Run llm.py
+            # Use project root as working directory so CSV files are read/written there
             process = subprocess.Popen(
                 [sys.executable, llm_script],
                 stdout=subprocess.PIPE,
@@ -183,7 +197,7 @@ class CreatorGPTAnalyzer:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                cwd=script_dir,
+                cwd=project_root,
                 bufsize=1,
                 universal_newlines=True
             )
@@ -212,9 +226,9 @@ class CreatorGPTAnalyzer:
                 print("SUCCESS: LLM processing completed successfully!")
                 print("Generated files:")
                 
-                # Check for generated batch files
-                comment_batches = glob.glob('comments_batch_*.txt')
-                analyzed_batches = glob.glob('analyzed_comments_batch_*.txt')
+                # Check for generated batch files in project root
+                comment_batches = glob.glob(self.get_project_path('comments_batch_*.txt'))
+                analyzed_batches = glob.glob(self.get_project_path('analyzed_comments_batch_*.txt'))
                 
                 print(f"   * {len(comment_batches)} comment batch files")
                 print(f"   * {len(analyzed_batches)} analyzed batch files")
@@ -243,7 +257,8 @@ class CreatorGPTAnalyzer:
         print("-" * 50)
         
         # Check if cleaned_all_comments.csv exists
-        if not os.path.exists('cleaned_all_comments.csv'):
+        cleaned_comments_path = self.get_project_path('cleaned_all_comments.csv')
+        if not os.path.exists(cleaned_comments_path):
             error_msg = "cleaned_all_comments.csv not found!"
             self.log_progress("sentiment_error", error_msg, 70, error=error_msg)
             print(f"ERROR: {error_msg}")
@@ -253,15 +268,21 @@ class CreatorGPTAnalyzer:
         self.log_progress("dashboard_start", "Starting comprehensive dashboard generation...", 70)
         
         try:
+            # Get paths for dashboard generation
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)  # Parent directory (project root)
+            dashboard_script = os.path.join(script_dir, 'generate_dashboard.py')
+            
             # Run the enhanced dashboard generator
+            # Use project root as working directory so CSV files are read from there
             process = subprocess.Popen(
-                [sys.executable, 'generate_dashboard.py'],
+                [sys.executable, dashboard_script],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                cwd=os.getcwd(),
+                cwd=project_root,
                 bufsize=1,
                 universal_newlines=True
             )
@@ -305,26 +326,30 @@ class CreatorGPTAnalyzer:
                 print("Generated files:")
                 
                 # Check for main dashboard
-                if os.path.exists('sentiment_analysis_dashboard.png'):
+                dashboard_path = self.get_project_path('sentiment_analysis_dashboard.png')
+                if os.path.exists(dashboard_path):
                     print("   * sentiment_analysis_dashboard.png (16-chart comprehensive dashboard)")
                 
                 # Check for data files
-                if os.path.exists('sentiment_analyzed_comments.csv'):
+                sentiment_csv_path = self.get_project_path('sentiment_analyzed_comments.csv')
+                if os.path.exists(sentiment_csv_path):
                     print("   * sentiment_analyzed_comments.csv (comments with sentiment scores)")
                     
-                if os.path.exists('detailed_sentiment_results.txt'):
+                results_txt_path = self.get_project_path('detailed_sentiment_results.txt')
+                if os.path.exists(results_txt_path):
                     print("   * detailed_sentiment_results.txt (detailed analysis)")
                 
                 # Check for individual charts
-                if os.path.exists('charts'):
-                    chart_files = glob.glob('charts/*.png')
+                charts_dir = self.get_project_path('charts')
+                if os.path.exists(charts_dir):
+                    chart_files = glob.glob(os.path.join(self.project_root, 'charts', '*.png'))
                     if chart_files:
                         print(f"   * charts/ directory with {len(chart_files)} individual charts")
                 
                 # Show quick summary
-                if os.path.exists('sentiment_analyzed_comments.csv'):
+                if os.path.exists(sentiment_csv_path):
                     try:
-                        df = pd.read_csv('sentiment_analyzed_comments.csv')
+                        df = pd.read_csv(sentiment_csv_path)
                         avg_score = df['sentiment_score'].mean()
                         
                         positive_pct = (df['sentiment'] == 'Positive').mean() * 100

@@ -23,7 +23,7 @@ if errorlevel 1 (
 )
 
 echo Installing Python dependencies...
-call pip install -r requirements.txt
+call pip install -r backend\requirements.txt
 if errorlevel 1 (
     echo Failed to install Python dependencies!
     pause
@@ -41,7 +41,7 @@ echo API Docs: http://localhost:8000/docs
 echo.
 
 echo Starting servers...
-start /b "Backend Server" cmd /k "python run_api.py"
+start /b "Backend Server" cmd /k "python backend\run_api.py"
 timeout /t 5 /nobreak >nul
 start /b "Frontend Server" cmd /k "npm run dev"
 

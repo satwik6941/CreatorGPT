@@ -104,9 +104,13 @@ class DashboardGenerator:
         log_progress("batch_processing", "Starting batch processing...", 30)
         
         try:
+            # Get the path to batch_processor.py in the backend folder
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            batch_script = os.path.join(script_dir, 'batch_processor.py')
+            
             # Run the enhanced batch processor
             result = subprocess.run([
-                sys.executable, 'batch_processor.py'
+                sys.executable, batch_script
             ], capture_output=True, text=True, cwd=os.getcwd())
             
             if result.returncode == 0:
@@ -130,8 +134,12 @@ class DashboardGenerator:
         log_progress("llm_fallback", "Running fallback LLM processing...", 35)
         
         try:
+            # Get the path to llm.py in the backend folder
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            llm_script = os.path.join(script_dir, 'llm.py')
+            
             result = subprocess.run([
-                sys.executable, 'llm.py'
+                sys.executable, llm_script
             ], capture_output=True, text=True, cwd=os.getcwd())
             
             if result.returncode == 0:
@@ -152,9 +160,13 @@ class DashboardGenerator:
         log_progress("dashboard_generation", "Generating sentiment analysis dashboard...", 75)
         
         try:
+            # Get the path to sentiment_score.py in the backend folder
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            sentiment_script = os.path.join(script_dir, 'sentiment_score.py')
+            
             # Run sentiment analysis with enhanced dashboard
             result = subprocess.run([
-                sys.executable, 'sentiment_score.py'
+                sys.executable, sentiment_script
             ], capture_output=True, text=True, cwd=os.getcwd())
             
             if result.returncode == 0:

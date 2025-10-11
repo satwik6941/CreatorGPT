@@ -15,7 +15,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Starting FastAPI Backend..." -ForegroundColor Yellow
 Write-Host "Backend will be available at: http://localhost:8000" -ForegroundColor Green
-Start-Process -FilePath "cmd" -ArgumentList "/k", "cd /d `"$PSScriptRoot`" && python run_api.py" -WindowStyle Normal
+Start-Process -FilePath "cmd" -ArgumentList "/k", "cd /d `"$PSScriptRoot`" && python backend\run_api.py" -WindowStyle Normal
 
 Write-Host ""
 Write-Host "Waiting for backend to initialize..." -ForegroundColor Yellow
